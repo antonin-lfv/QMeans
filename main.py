@@ -27,17 +27,6 @@ X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.3, random_state=random_state
 )
 
-# delta-KMeans
-# delta_kmeans = DeltaKMeans(n_clusters=n_clusters, random_state=random_state,
-# delta_init=0.2).fit(X_train, X_test, y_test)
-# delta_kmeans.plot_clusters(X_train, X_test)
-# delta_kmeans.plot_accuracy()
-
-# KMeans classique
-# classic_kmeans = ClassicKMeans(n_clusters=n_clusters, random_state=random_state).fit(X_train, X_test, y_test)
-# classic_kmeans.plot_clusters(X_train, X_test)
-# classic_kmeans.plot_accuracy()
-
 # Comparaison des accuracy
 fig = go.Figure()
 # On teste delta_init = 0.2, 0.3, 0.4 et 0.5 en pointillés
@@ -129,12 +118,16 @@ fig.add_annotation(
     borderpad=1,
     xref="paper",
     yref="paper",
+    # size of the annotation text
+    font=dict(size=20),
 )
 
 fig.update_layout(
     title="Accuracy en fonction du nombre d'itérations",
     xaxis_title="Nombre d'itérations",
     yaxis_title="Accuracy (%)",
+    # legend text size
+    font=dict(size=15),
 )
 
 plot(fig, filename="accuracy_comparison.html")

@@ -1,10 +1,10 @@
 import numpy as np
 import plotly.graph_objects as go
 from plotly.offline import plot
-from utils import get_cluster_labels, compute_accuracy, euclidean_distance
+from utils import get_cluster_labels, compute_accuracy, distance_centroids_parallel
 
 
-class ClassicKMeans:
+class QKMeans:
     def __init__(self, n_clusters, max_iter=50, random_state=None):
         self.n_clusters = n_clusters
         self.max_iter = max_iter
@@ -20,23 +20,31 @@ class ClassicKMeans:
         centroids_idx = rng.choice(n_samples, size=self.n_clusters, replace=False)
         self.centroids_ = X[centroids_idx, :]
 
-    def fit(self, X_train, X_test, y_test):
+    def fit(self, X_train, X_test, y_test, backend=None, shots=1024):
         self.initialize_centroids(X_train)
         labels = None
 
-        for _ in range(self.max_iter):
-            labels = np.argmin(
-                np.array(
-                    [
-                        [
-                            euclidean_distance(x, centroid)
-                            for centroid in self.centroids_
-                        ]
-                        for x in X_train
-                    ]
-                ),
-                axis=1,
+        for iteration in range(self.max_iter):
+            print(f"X: type={type(X_train)}, shape={X_train.shape}")
+            print(
+                f"centroids: type={type(self.centroids_)}, shape={self.centroids_.shape}"
             )
+            distances = np.array(
+                list(
+                    map(
+                        lambda x: distance_centroids_parallel(
+                            x, self.centroids_, backend, shots
+                        ),
+                        X_train,
+                    )
+                )
+            )
+
+            print(
+                f"Distances of all points to all centroids done ! Iteration : {iteration}"
+            )
+
+            labels = np.argmin(distances, axis=1)
 
             new_centroids = np.array(
                 [X_train[labels == i].mean(axis=0) for i in range(self.n_clusters)]
@@ -48,24 +56,25 @@ class ClassicKMeans:
             self.centroids_ = new_centroids
 
             # Calcul de l'accuracy
-            y_pred_test = self.predict(X_test)
+            y_pred_test = self.predict(X_test, backend, shots)
             y_mapped_test = get_cluster_labels(y_pred_test, y_test)
-
             self.accuracy_train.append(compute_accuracy(y_mapped_test, y_test))
 
         self.labels_ = labels
         return self
 
-    def predict(self, X):
-        return np.argmin(
-            np.array(
-                [
-                    [euclidean_distance(x, centroid) for centroid in self.centroids_]
-                    for x in X
-                ]
-            ),
-            axis=1,
+    def predict(self, X, backend=None, shots=1024):
+        distances = np.array(
+            list(
+                map(
+                    lambda x: distance_centroids_parallel(
+                        x, self.centroids_, backend, shots
+                    ),
+                    X,
+                )
+            )
         )
+        return np.argmin(distances, axis=1)
 
     def plot_clusters(self, X_train, X_test):
         centroids_x = self.centroids_[:, 0]
@@ -123,3 +132,8 @@ class ClassicKMeans:
         )
         fig.update_layout(title="Accuracy classic KMeans")
         plot(fig, filename="accuracy.html")
+
+
+# main
+if __name__ == "__main__":
+    ...
