@@ -2,6 +2,7 @@ import numpy as np
 import plotly.graph_objects as go
 from plotly.offline import plot
 from utils import get_cluster_labels, compute_accuracy, distance_centroids_parallel
+from tqdm import tqdm
 
 
 class QKMeans:
@@ -24,11 +25,7 @@ class QKMeans:
         self.initialize_centroids(X_train)
         labels = None
 
-        for iteration in range(self.max_iter):
-            print(f"X: type={type(X_train)}, shape={X_train.shape}")
-            print(
-                f"centroids: type={type(self.centroids_)}, shape={self.centroids_.shape}"
-            )
+        for _ in tqdm(range(self.max_iter)):
             distances = np.array(
                 list(
                     map(
@@ -38,10 +35,6 @@ class QKMeans:
                         X_train,
                     )
                 )
-            )
-
-            print(
-                f"Distances of all points to all centroids done ! Iteration : {iteration}"
             )
 
             labels = np.argmin(distances, axis=1)
@@ -59,6 +52,7 @@ class QKMeans:
             y_pred_test = self.predict(X_test, backend, shots)
             y_mapped_test = get_cluster_labels(y_pred_test, y_test)
             self.accuracy_train.append(compute_accuracy(y_mapped_test, y_test))
+            print(f"Accuracy: {round(self.accuracy_train[-1],3)}")
 
         self.labels_ = labels
         return self
@@ -114,9 +108,9 @@ class QKMeans:
             )
         )
 
-        fig.update_layout(title="Classic KMeans")
+        fig.update_layout(title="Q-Means")
 
-        plot(fig, filename="classic_kmeans.html")
+        plot(fig, filename="q_kmeans_clusters.html")
 
     def plot_accuracy(self):
         fig = go.Figure()
@@ -130,8 +124,8 @@ class QKMeans:
                 name="Accuracy",
             )
         )
-        fig.update_layout(title="Accuracy classic KMeans")
-        plot(fig, filename="accuracy.html")
+        fig.update_layout(title="Accuracy quantum KMeans")
+        plot(fig, filename="accuracy_q_means.html")
 
 
 # main

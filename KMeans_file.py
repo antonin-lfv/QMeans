@@ -107,7 +107,7 @@ class ClassicKMeans:
 
         fig.update_layout(title="Classic KMeans")
 
-        plot(fig, filename="classic_kmeans.html")
+        plot(fig, filename="qmeans_7_iterations.html")
 
     def plot_accuracy(self):
         fig = go.Figure()

@@ -6,7 +6,7 @@ import plotly.graph_objects as go
 from plotly.offline import plot
 import numpy as np
 
-# Paramètres
+# Parameters
 n_clusters = 5
 n_features = 5
 n_samples = 30000

@@ -8,3 +8,4 @@ scikit-learn~=1.2.1
 scipy~=1.9.3
 qiskit~=0.44.1
 qiskit-ibmq-provider
+tqdm~=4.64.1
