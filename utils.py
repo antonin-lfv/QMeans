@@ -157,11 +157,15 @@ def distances_for_multiple_examples_tests(
     :param shots: int, number of shots to use
 
     Examples:
-    # num_examples=100, shots=2048
+    # num_examples=100, shots=2048, num_centroids=5
         Les tests sont terminés, 19 erreurs ont été trouvées sur 100 exemples.
         - 81.0 % de réussite !
 
+    # num_examples=200, shots=4096, num_centroids=5
+         Tests finished, 40 errors were found out of 200 examples.
+         - 80.0 % success rate !
     """
+
     nb_failures = 0
     for i in tqdm(range(num_examples)):
         if verbose:
@@ -209,4 +213,4 @@ def distances_for_multiple_examples_tests(
 
 
 if __name__ == "__main__":
-    distances_for_multiple_examples_tests(num_examples=100, verbose=False, shots=2048)
+    distances_for_multiple_examples_tests(num_examples=200, verbose=False, shots=4096)
