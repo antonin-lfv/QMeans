@@ -1,8 +1,13 @@
 from qiskit import QuantumCircuit, execute, QuantumRegister, ClassicalRegister
 from qiskit_ibm_provider import IBMProvider
+from qiskit.tools.visualization import circuit_drawer
 
+import plotly.graph_objects as go
+from plotly.offline import plot
 import matplotlib.pyplot as plt
 import math
+import random
+from tqdm import tqdm
 
 
 def qubits_needed(n):
@@ -14,11 +19,29 @@ def qubits_needed(n):
         return math.ceil(math.log2(n + 1))
 
 
-def encode(bit):
+def encode(bit, plot_circuit=False):
     qr = QuantumRegister(1, "number")
     qc = QuantumCircuit(qr)
     if bit == "1":
         qc.x(qr[0])
+
+    if plot_circuit:
+        qc.draw(output="mpl")
+        plt.show()
+    return qc
+
+
+def encode_bitstring(bitstring, plot_circuit=True):
+    bits = len(bitstring)
+    qr = QuantumRegister(bits, "bit")
+    qc = QuantumCircuit(qr)
+    for i in range(bits):
+        if bitstring[i] == "1":
+            qc.x(qr[i])
+
+    if plot_circuit:
+        qc.draw(output="mpl")
+        plt.show()
     return qc
 
 
@@ -90,9 +113,6 @@ def compare_bitstring(bitstring_a, bitstring_b, plot_circuit=False):
     qc.measure(qraux[0], cr[0])
     qc.measure(qraux[1], cr[1])
 
-    # Tell Qiskit how to simulate our circuit
-    backend = provider.get_backend("ibmq_qasm_simulator")
-
     # Do the simulation, returning the result
     result = execute(qc, backend, shots=1024).result()
 
@@ -100,7 +120,7 @@ def compare_bitstring(bitstring_a, bitstring_b, plot_circuit=False):
     counts = result.get_counts()
 
     if plot_circuit:
-        qc.draw(output="mpl")
+        circuit_drawer(qc, output="mpl")
         plt.show()
 
     return counts
@@ -108,14 +128,14 @@ def compare_bitstring(bitstring_a, bitstring_b, plot_circuit=False):
 
 # IBMQ account
 provider = IBMProvider()
-backend = provider.get_backend("ibmq_qasm_simulator")
+backend = provider.get_backend("simulator_mps")
 
 # Test compare_bitstring
-# b1 = "101"
-# b2 = "100"
+# b1 = "11"
+# b2 = "01"
 # counts = compare_bitstring(b1, b2, plot_circuit=True)
-# print(f"First bitstring: {b1}, that is {bits_to_int(b1)}")
-# print(f"Second bitstring: {b2}, that is {bits_to_int(b2)}")
+# print(f"First bitstring: '{b1}', that is {bits_to_int(b1)}")
+# print(f"Second bitstring: '{b2}', that is {bits_to_int(b2)}")
 # print(counts)
 
 # if '01' has higher score, then the second bitstring is smaller
@@ -132,7 +152,7 @@ def quantum_find_min(list_of_bits) -> (int, int):
     min_index = 0
     min_value = bits_to_int(list_of_bits[0])
     for i in range(1, len(list_of_bits)):
-        print(f"Comparing {list_of_bits[min_index]} and {list_of_bits[i]}")
+        # print(f"Comparing {list_of_bits[min_index]} and {list_of_bits[i]}")
         counts = compare_bitstring(list_of_bits[min_index], list_of_bits[i])
         if "01" not in counts:
             counts["01"] = 0
@@ -145,9 +165,89 @@ def quantum_find_min(list_of_bits) -> (int, int):
 
 
 # Test quantum_find_min
-bitstrings = ["1101", "1010", "1110", "0110", "0101", "1111", "1011"]
-min_value, min_index = quantum_find_min(bitstrings)
-print(f"Bitstring : {[bits_to_int(bitstring) for bitstring in bitstrings]}")
-print(
-    f"The minimum bitstring is: {bitstrings[min_index]}, with value {min_value} and index {min_index}"
-)
+def test_quantum_find_min():
+    bitstrings = ["1101", "1010", "1110", "0110", "0101", "1111", "1011"]
+    min_value, min_index = quantum_find_min(bitstrings)
+    print(f"Bitstring : {[bits_to_int(bitstring) for bitstring in bitstrings]}")
+    print(
+        f"The minimum bitstring is: {bitstrings[min_index]}, with value {min_value} and index {min_index}"
+    )
+    return min_value, min_index
+
+
+def get_success_rate(nb_bits=3, list_size=3, nb_tests=50):
+    """
+    Get the success rate of quantum_find_min with random bitstrings
+    :param nb_bits: number of bits to represent each integer
+    :param list_size: number of integers in the list
+    :param nb_tests: number of tests to perform
+    """
+    random.seed(0)
+    nb_success = 0
+    for _ in tqdm(range(nb_tests)):
+        list_of_ints = [random.randint(0, 2**nb_bits - 1) for _ in range(list_size)]
+        list_of_bits = [int_to_bits(integer, nb_bits) for integer in list_of_ints]
+        min_value, min_index = quantum_find_min(list_of_bits)
+        if min_value == min(list_of_ints):
+            nb_success += 1
+
+    print(f"Success rate: {nb_success / nb_tests}")
+    return nb_success / nb_tests
+
+
+# get_success_rate(4, 10, 50)
+
+
+# Pourcentage de réussite avec une liste de 5 elements sur 2 bits : 0.72 (50 tests)
+# Pourcentage de réussite avec une liste de 3 elements sur 2 bits : 0.74 (50 tests)
+# Pourcentage de réussite avec une liste de 5 elements sur 3 bits : 0.82 (50 tests)
+# Pourcentage de réussite avec une liste de 3 elements sur 3 bits : 0.96 (50 tests)
+# Pourcentage de réussite avec une liste de 5 elements sur 4 bits : 0.52 (50 tests)
+# Pourcentage de réussite avec une liste de 3 elements sur 4 bits : 0.70 (50 tests)
+# Pourcentage de réussite avec une liste de 5 elements sur 5 bits : 0.46 (50 tests)
+# Pourcentage de réussite avec une liste de 3 elements sur 5 bits : 0.62 (50 tests)
+# Pourcentage de réussite avec une liste de 5 elements sur 6 bits : 0.48 (50 tests)
+# Pourcentage de réussite avec une liste de 3 elements sur 6 bits : 0.68 (50 tests)
+# Pourcentage de réussite avec une liste de 5 elements sur 7 bits : 0.44 (50 tests)
+# Pourcentage de réussite avec une liste de 3 elements sur 7 bits : 0.62 (50 tests)
+# Pourcentage de réussite avec une liste de 5 elements sur 8 bits : 0.38 (50 tests)
+# Pourcentage de réussite avec une liste de 3 elements sur 8 bits : 0.52 (50 tests)
+
+
+def plot_success_rate():
+    nb_tests = 50
+    nb_bits = [2, 3, 4, 5, 6, 7, 8]
+    success_rate_size_5 = [0.72, 0.82, 0.52, 0.46, 0.48, 0.44, 0.38]
+    success_rate_size_3 = [0.74, 0.96, 0.7, 0.62, 0.68, 0.62, 0.52]
+
+    # Using plotly, create a scatter plot of the success rates with 2 lines
+    fig = go.Figure()
+    # With size 5, nb_bits on x-axis, success rate on y-axis
+    fig.add_scatter(
+        x=nb_bits,
+        y=success_rate_size_5,
+        name="Liste de 5 entiers",
+        line=dict(color="firebrick", width=2, dash="dot"),
+    )
+    # With size 3, nb_bits on x-axis, success rate on y-axis
+    fig.add_scatter(
+        x=nb_bits,
+        y=success_rate_size_3,
+        name="Liste de 3 entiers",
+        line=dict(color="royalblue", width=2, dash="dot"),
+    )
+    fig.update_layout(
+        xaxis_title="Nombre de bits pour représenter un entier",
+        yaxis_title=f"Taux de réussite de la recherche du minimum sur {nb_tests} tests",
+        template="plotly_white",
+        # text size
+        font=dict(size=20),
+    )
+
+    # legend top right
+    fig.update_layout(legend=dict(x=0.8, y=0.9))
+
+    plot(fig, filename="success_rate.html")
+
+
+# plot_success_rate()
