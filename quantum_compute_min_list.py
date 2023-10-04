@@ -69,7 +69,7 @@ def bits_to_int(bits):
     return int(bits, 2)
 
 
-def int_to_bits(integer, num_bits):
+def int_to_bits(integer, num_bits=4):
     """
     Convert an integer to a bitstring
     :param integer: integer to convert
@@ -79,7 +79,7 @@ def int_to_bits(integer, num_bits):
     return format(integer, f"0{num_bits}b")
 
 
-def compare_bitstring(bitstring_a, bitstring_b, plot_circuit=False):
+def compare_bitstring(bitstring_a, bitstring_b, plot_circuit=False, shots=1024):
     bits = max(
         qubits_needed(bits_to_int(bitstring_a)), qubits_needed(bits_to_int(bitstring_b))
     )
@@ -114,7 +114,7 @@ def compare_bitstring(bitstring_a, bitstring_b, plot_circuit=False):
     qc.measure(qraux[1], cr[1])
 
     # Do the simulation, returning the result
-    result = execute(qc, backend, shots=1024).result()
+    result = execute(qc, backend, shots=shots).result()
 
     # get the probability distribution
     counts = result.get_counts()
@@ -143,17 +143,21 @@ backend = provider.get_backend("simulator_mps")
 # if '00' has higher score, then the bitstrings are equal
 
 
-def quantum_find_min(list_of_bits) -> (int, int):
+def quantum_find_min(list_of_bits, shots=1024, only_index=False) -> (int, int):
     """
     Find the minimum bitstring in a list of bitstrings and return its index
     :param list_of_bits: list of bitstrings to compare e.g. ["0101", "0100", "0110", "0010", "1001"]
+    :param shots: number of shots to perform
+    :param only_index: if True, return only the index of the minimum bitstring
     :return: index of minimum bitstring
     """
     min_index = 0
     min_value = bits_to_int(list_of_bits[0])
     for i in range(1, len(list_of_bits)):
         # print(f"Comparing {list_of_bits[min_index]} and {list_of_bits[i]}")
-        counts = compare_bitstring(list_of_bits[min_index], list_of_bits[i])
+        counts = compare_bitstring(
+            list_of_bits[min_index], list_of_bits[i], shots=shots
+        )
         if "01" not in counts:
             counts["01"] = 0
         if "10" not in counts:
@@ -161,13 +165,17 @@ def quantum_find_min(list_of_bits) -> (int, int):
         if counts["01"] > counts["10"]:
             min_index = i
             min_value = bits_to_int(list_of_bits[i])
+
+    if only_index:
+        return min_index
+
     return min_value, min_index
 
 
 # Test quantum_find_min
 def test_quantum_find_min():
-    bitstrings = ["1101", "1010", "1110", "0110", "0101", "1111", "1011"]
-    min_value, min_index = quantum_find_min(bitstrings)
+    bitstrings = ["1101", "0010", "1110", "0110", "0101", "1111", "1011"]
+    min_value, min_index = quantum_find_min(bitstrings, shots=4096)
     print(f"Bitstring : {[bits_to_int(bitstring) for bitstring in bitstrings]}")
     print(
         f"The minimum bitstring is: {bitstrings[min_index]}, with value {min_value} and index {min_index}"
@@ -175,19 +183,20 @@ def test_quantum_find_min():
     return min_value, min_index
 
 
-def get_success_rate(nb_bits=3, list_size=3, nb_tests=50):
+def get_success_rate(nb_bits=5, list_size=3, nb_tests=50, shots=4096):
     """
     Get the success rate of quantum_find_min with random bitstrings
     :param nb_bits: number of bits to represent each integer
     :param list_size: number of integers in the list
     :param nb_tests: number of tests to perform
+    :param shots: number of shots to perform
     """
     random.seed(0)
     nb_success = 0
     for _ in tqdm(range(nb_tests)):
         list_of_ints = [random.randint(0, 2**nb_bits - 1) for _ in range(list_size)]
         list_of_bits = [int_to_bits(integer, nb_bits) for integer in list_of_ints]
-        min_value, min_index = quantum_find_min(list_of_bits)
+        min_value, min_index = quantum_find_min(list_of_bits, shots=shots)
         if min_value == min(list_of_ints):
             nb_success += 1
 
@@ -195,7 +204,7 @@ def get_success_rate(nb_bits=3, list_size=3, nb_tests=50):
     return nb_success / nb_tests
 
 
-# get_success_rate(4, 10, 50)
+# get_success_rate(4, 5, 50, 4096)
 
 
 # Pourcentage de réussite avec une liste de 5 elements sur 2 bits : 0.72 (50 tests)

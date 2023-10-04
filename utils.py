@@ -147,7 +147,7 @@ def distance_centroids_parallel(point, centroids, backend, shots=1024):
 
 
 def distances_for_multiple_examples_tests(
-    num_examples=100, num_centroids=5, verbose=True, shots=1024
+    num_examples=300, num_centroids=3, verbose=True, shots=1024
 ):
     """
     Test the distance_centroids_parallel function on multiple examples
@@ -161,9 +161,9 @@ def distances_for_multiple_examples_tests(
         Les tests sont terminés, 19 erreurs ont été trouvées sur 100 exemples.
         - 81.0 % de réussite !
 
-    # num_examples=200, shots=4096, num_centroids=5
+    # num_examples=300, shots=4096, num_centroids=5
          Tests finished, 40 errors were found out of 200 examples.
-         - 80.0 % success rate !
+         - 88.0 % success rate !
     """
 
     nb_failures = 0
@@ -213,4 +213,4 @@ def distances_for_multiple_examples_tests(
 
 
 if __name__ == "__main__":
-    distances_for_multiple_examples_tests(num_examples=200, verbose=False, shots=4096)
+    distances_for_multiple_examples_tests(num_examples=300, verbose=False, shots=4096)
