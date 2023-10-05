@@ -1,15 +1,7 @@
 import numpy as np
-from utils import get_cluster_labels, compute_accuracy
+from classical_utils import get_cluster_labels, compute_accuracy, euclidean_distance
 from plotly.offline import plot
 import plotly.graph_objects as go
-from fastdist import fastdist
-
-
-def euclidean_distance(X, Y):
-    """
-    Calcule la distance euclidienne entre deux vecteurs X et Y
-    """
-    return fastdist.euclidean(X, Y)
 
 
 class DeltaKMeans:

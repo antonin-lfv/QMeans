@@ -2,42 +2,15 @@ import numpy as np
 import plotly.graph_objects as go
 from plotly.offline import plot
 from classical_utils import get_cluster_labels, compute_accuracy
-from quantum_utils import distance_centroids_parallel, quantum_find_min, int_to_bits
+from quantum_utils import (
+    distance_centroids_parallel,
+    transform_distances_matrix_to_bit_matrix,
+    apply_quantum_find_min,
+)
 from tqdm import tqdm
 
 
-def rank_and_convert(row):
-    """
-    Trouve les valeurs uniques, les trie, et retourne les indices de chaque élément.
-    Convertit ensuite ces indices en bitstrings.
-    """
-    unique_values, inverse_indices = np.unique(row, return_inverse=True)
-    bit_row = np.vectorize(int_to_bits)(inverse_indices + 1, 3)
-    return bit_row
-
-
-def transform_distances_matrix_to_bit_matrix(matrix):
-    """
-    Transforme une matrice de distances en une matrice de bits.
-    Pour cela, on commence par trier les valeurs uniques de la matrice, puis on convertit chaque valeur en bits.
-    On obtient ainsi une matrice de bits.
-    """
-    bit_matrix = np.apply_along_axis(rank_and_convert, axis=1, arr=matrix)
-    return bit_matrix
-
-
-def apply_quantum_find_min(row):
-    """
-    Applique la fonction quantum_find_min à une ligne de la matrice de bits.
-    """
-    # Convertir la ligne en liste de chaînes de bits
-    list_of_bits = row.tolist()
-    # Appeler quantum_find_min et retourner seulement l'index
-    index = quantum_find_min(list_of_bits, only_index=True, shots=4096)
-    return index
-
-
-class QKMeans:
+class QMeans:
     def __init__(
         self, n_clusters, max_iter=50, random_state=None, init_method="kmeans++"
     ):
