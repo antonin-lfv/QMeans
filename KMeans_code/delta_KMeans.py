@@ -149,7 +149,7 @@ class DeltaKMeans:
         fig.update_layout(title="delta-KMeans")
 
         # Afficher la figure
-        plot(fig, filename="delta_kmeans.html")
+        plot(fig, filename="images/delta_kmeans.html")
 
     def plot_accuracy(self):
         fig = go.Figure()
@@ -166,4 +166,4 @@ class DeltaKMeans:
         fig.update_layout(
             title=f"Accuracy classic KMeans, delta_init = {self.delta_init}"
         )
-        plot(fig, filename="accuracy_delta_kmeans.html")
+        plot(fig, filename="images/accuracy_delta_kmeans.html")

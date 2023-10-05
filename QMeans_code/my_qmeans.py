@@ -1,8 +1,8 @@
 import numpy as np
 import plotly.graph_objects as go
 from plotly.offline import plot
-from utils import get_cluster_labels, compute_accuracy, distance_centroids_parallel
-from quantum_compute_min_list import quantum_find_min, int_to_bits, bits_to_int
+from classical_utils import get_cluster_labels, compute_accuracy
+from quantum_utils import distance_centroids_parallel, quantum_find_min, int_to_bits
 from tqdm import tqdm
 
 
@@ -218,7 +218,7 @@ class QKMeans:
 
         fig.update_layout(title="Q-Means")
 
-        plot(fig, filename="q_kmeans_clusters.html")
+        plot(fig, filename="images/q_kmeans_clusters.html")
 
     @staticmethod
     def plot_data_with_labels(X_train, iter_n, labels, centroids):
@@ -271,7 +271,7 @@ class QKMeans:
 
         fig.update_layout(title=f"Q-Means - Iteration {iter_n}")
 
-        plot(fig, filename=f"q_kmeans_clusters_{iter_n}.html")
+        plot(fig, filename=f"images/q_kmeans_clusters_{iter_n}.html")
 
     def plot_accuracy(self):
         fig = go.Figure()
@@ -286,7 +286,7 @@ class QKMeans:
             )
         )
         fig.update_layout(title="Accuracy quantum KMeans")
-        plot(fig, filename="accuracy_q_means.html")
+        plot(fig, filename="images/accuracy_q_means.html")
 
 
 # main

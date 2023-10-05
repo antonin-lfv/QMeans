@@ -57,7 +57,7 @@ fig.add_trace(
         name="Points de test",
     )
 )
-plot(fig)
+plot(fig, filename="images/q_kmeans_data.html")
 
 # model
 print("Start training...")

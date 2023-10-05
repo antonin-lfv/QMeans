@@ -1,7 +1,7 @@
 import numpy as np
 import plotly.graph_objects as go
 from plotly.offline import plot
-from utils import get_cluster_labels, compute_accuracy, euclidean_distance
+from classical_utils import get_cluster_labels, compute_accuracy, euclidean_distance
 
 
 class ClassicKMeans:
@@ -107,7 +107,7 @@ class ClassicKMeans:
 
         fig.update_layout(title="Classic KMeans")
 
-        plot(fig, filename="qmeans_7_iterations.html")
+        plot(fig, filename="images/qmeans_iterations.html")
 
     def plot_accuracy(self):
         fig = go.Figure()
@@ -122,4 +122,4 @@ class ClassicKMeans:
             )
         )
         fig.update_layout(title="Accuracy classic KMeans")
-        plot(fig, filename="accuracy.html")
+        plot(fig, filename="images/accuracy.html")
