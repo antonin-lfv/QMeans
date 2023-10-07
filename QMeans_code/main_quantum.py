@@ -1,18 +1,28 @@
 from QMeans_code.my_qmeans import QMeans
 from qiskit_ibm_provider import IBMProvider
+from qiskit_ionq import IonQProvider
 
-# from config import IBM_QUANTUM_API_TOKEN
+from config import IBM_QUANTUM_API_TOKEN, IONQ_API_TOKEN
 from dataset import Kmeans_dataset
 
 if __name__ == "__main__":
-    # Save IBMQ account
-    # IBMProvider.save_account(IBM_QUANTUM_API_TOKEN)
-    # Load IBMQ account
-    provider = IBMProvider()
-    # Print available backends
-    # print(provider.backends())
-    # Choose backend
-    backend = provider.get_backend("ibmq_qasm_simulator")
+    provider = "IBM"
+    if provider == "IBM":
+        # Save IBMQ account
+        # IBMProvider.save_account(IBM_QUANTUM_API_TOKEN)
+        # Load IBMQ account
+        provider = IBMProvider()
+        # Print available backends
+        # print(provider.backends())
+        # Choose backend
+        backend = provider.get_backend("ibmq_qasm_simulator")
+    else:
+        # Save IonQ account
+        provider = IonQProvider(IONQ_API_TOKEN)
+        # print available backends
+        print(provider.backends())
+        # Choose backend
+        backend = provider.get_backend("ionq_simulator")
 
     # Parameters
     n_clusters = 3

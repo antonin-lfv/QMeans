@@ -193,7 +193,7 @@ def quantum_find_min(list_of_bits, shots=1024, only_index=False) -> (int, int):
     :param list_of_bits: list of bitstrings to compare e.g. ["0101", "0100", "0110", "0010", "1001"]
     :param shots: number of shots to perform
     :param only_index: if True, return only the index of the minimum bitstring
-    :return: index of minimum bitstring
+    :return: value of the min and index of it in list_of_bits or only the index
     """
     min_index = 0
     min_value = bits_to_int(list_of_bits[0])
@@ -216,6 +216,35 @@ def quantum_find_min(list_of_bits, shots=1024, only_index=False) -> (int, int):
     return min_value, min_index
 
 
+def quantum_find_max(list_of_bits, shots=1024, only_index=False) -> (int, int):
+    """
+    Find the maximum bitstring in a list of bitstrings and return its index
+    :param list_of_bits: list of bitstrings to compare e.g. ["0101", "0100", "0110", "0010", "1001"]
+    :param shots: number of shots to perform
+    :param only_index: if True, return only the index of the maximum bitstring
+    :return: value of the max and index of it in list_of_bits or only the index
+    """
+    max_index = 0
+    max_value = bits_to_int(list_of_bits[0])
+    for i in range(1, len(list_of_bits)):
+        # print(f"Comparing {list_of_bits[min_index]} and {list_of_bits[i]}")
+        counts = compare_bitstring(
+            list_of_bits[max_index], list_of_bits[i], shots=shots
+        )
+        if "01" not in counts:
+            counts["01"] = 0
+        if "10" not in counts:
+            counts["10"] = 0
+        if counts["01"] < counts["10"]:
+            max_index = i
+            max_value = bits_to_int(list_of_bits[i])
+
+    if only_index:
+        return max_index
+
+    return max_value, max_index
+
+
 # Test quantum_find_min
 def test_quantum_find_min():
     bitstrings = ["1101", "0010", "1110", "0110", "0101", "1111", "1011"]
@@ -227,7 +256,18 @@ def test_quantum_find_min():
     return min_value, min_index
 
 
-def get_success_rate(nb_bits=5, list_size=3, nb_tests=50, shots=4096):
+# test_quantum_find_max
+def test_quantum_find_max():
+    bitstrings = ["1101", "0010", "1110", "0110", "0101", "1111", "1011"]
+    max_value, max_index = quantum_find_max(bitstrings, shots=4096)
+    print(f"Bitstring : {[bits_to_int(bitstring) for bitstring in bitstrings]}")
+    print(
+        f"The maximum bitstring is: {bitstrings[max_index]}, with value {max_value} and index {max_index}"
+    )
+    return max_value, max_index
+
+
+def get_success_rate_min(nb_bits=5, list_size=3, nb_tests=50, shots=4096):
     """
     Get the success rate of quantum_find_min with random bitstrings
     :param nb_bits: number of bits to represent each integer
@@ -244,13 +284,14 @@ def get_success_rate(nb_bits=5, list_size=3, nb_tests=50, shots=4096):
         if min_value == min(list_of_ints):
             nb_success += 1
 
-    print(f"Success rate: {nb_success / nb_tests}")
+    print(f"Success rate find min: {nb_success / nb_tests}")
     return nb_success / nb_tests
 
 
-# get_success_rate(4, 5, 50, 4096)
+# get_success_rate_min(4, 5, 50, 4096)
 
 
+# Success rate with find_min
 # Pourcentage de réussite avec une liste de 5 elements sur 2 bits : 0.72 (50 tests)
 # Pourcentage de réussite avec une liste de 3 elements sur 2 bits : 0.74 (50 tests)
 # Pourcentage de réussite avec une liste de 5 elements sur 3 bits : 0.82 (50 tests)
@@ -267,7 +308,7 @@ def get_success_rate(nb_bits=5, list_size=3, nb_tests=50, shots=4096):
 # Pourcentage de réussite avec une liste de 3 elements sur 8 bits : 0.52 (50 tests)
 
 
-def plot_success_rate():
+def plot_success_rate_min():
     nb_tests = 50
     nb_bits = [2, 3, 4, 5, 6, 7, 8]
     success_rate_size_5 = [0.72, 0.82, 0.52, 0.46, 0.48, 0.44, 0.38]
@@ -304,6 +345,38 @@ def plot_success_rate():
 
 
 # plot_success_rate()
+
+
+def get_success_rate_max(nb_bits=5, list_size=3, nb_tests=50, shots=4096):
+    """
+    Get the success rate of quantum_find_max with random bitstrings
+    :param nb_bits: number of bits to represent each integer
+    :param list_size: number of integers in the list
+    :param nb_tests: number of tests to perform
+    :param shots: number of shots to perform
+    """
+    random.seed(0)
+    nb_success = 0
+    for _ in tqdm(range(nb_tests)):
+        list_of_ints = [random.randint(0, 2**nb_bits - 1) for _ in range(list_size)]
+        list_of_bits = [int_to_bits(integer, nb_bits) for integer in list_of_ints]
+        max_value, max_index = quantum_find_max(list_of_bits, shots=shots)
+        if max_value == max(list_of_ints):
+            nb_success += 1
+
+    print(
+        f"# Pourcentage de réussite avec une liste de {list_size} elements sur {nb_bits} "
+        f"bits : {nb_success / nb_tests} ({nb_tests} tests)"
+    )
+    return nb_success / nb_tests
+
+
+# get_success_rate_max(4, 5, 50, 4096)
+
+
+# Success rate with find_max
+# Pourcentage de réussite avec une liste de 5 elements sur 4 bits : 0.64 (50 tests)
+# Pourcentage de réussite avec une liste de 3 elements sur 4 bits : 0.82 (50 tests)
 
 
 # ======================================================================================================================
@@ -353,8 +426,8 @@ def distance_centroids_parallel(point, centroids, backend, shots=1024):
     Computes it in parallel for all centroids
 
     Parameters:
-        point: point to measure distance from
-        centroids: list of centroids
+        point: point to measure distance from, e.g. [0.1, 0.2]
+        centroids: list of centroids, e.g. [[0.1, 0.2], [0.3, 0.4], [0.5, 0.6]] (3 centroids so list of length 3)
         backend (IBMProvider backend): backend to use
         shots (int): number of shots to use
     """

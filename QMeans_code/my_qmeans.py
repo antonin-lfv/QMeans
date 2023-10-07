@@ -237,7 +237,7 @@ class QMeans:
                 x=centroids[:, 0],
                 y=centroids[:, 1],
                 mode="markers",
-                marker=dict(size=10, color=centroids_colors, symbol="cross"),
+                marker=dict(size=10, color="red", symbol="cross"),
                 name="Centroïdes",
             )
         )
