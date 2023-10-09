@@ -12,7 +12,7 @@ from tqdm import tqdm
 
 class QMeans:
     def __init__(
-        self, n_clusters, max_iter=50, random_state=None, init_method="kmeans++"
+        self, n_clusters, max_iter=5, random_state=None, init_method="kmeans++"
     ):
         self.n_clusters = n_clusters
         self.max_iter = max_iter
@@ -80,7 +80,7 @@ class QMeans:
 
         labels = None
 
-        for iter_number in tqdm(range(self.max_iter)):
+        for _ in tqdm(range(self.max_iter)):
             distances = np.array(
                 list(
                     map(
@@ -93,16 +93,14 @@ class QMeans:
             )
 
             # Calcul des labels de manière classique
-            labels = np.argmin(distances, axis=1)
-            print(f"Labels: {labels}")
+            # labels = np.argmin(distances, axis=1)
+            # print(f"Labels: {labels}")
             # Calcul des labels de manière quantique
             bit_matrix = transform_distances_matrix_to_bit_matrix(distances)
 
             # On calcule le minimum quantique pour chaque point pour avoir les labels
             labels = np.apply_along_axis(apply_quantum_find_min, axis=1, arr=bit_matrix)
-            print(f"Labels quantiques: {labels}")
-
-            self.plot_data_with_labels(X_train, iter_number, labels, self.centroids_)
+            # print(f"Labels quantiques: {labels}")
 
             new_centroids = np.array(
                 [X_train[labels == i].mean(axis=0) for i in range(self.n_clusters)]
@@ -114,8 +112,6 @@ class QMeans:
 
             self.centroids_ = new_centroids
 
-            self.plot_data_with_labels(X_train, iter_number, labels, self.centroids_)
-
             # Calcul de l'accuracy
             y_pred_test = self.predict(X_test, backend, shots)
             y_mapped_test = get_cluster_labels(y_pred_test, y_test)
@@ -123,7 +119,7 @@ class QMeans:
             print(f"Accuracy: {round(self.accuracy_train[-1],3)}")
 
             if self.accuracy_train[-1] >= 0.95 and len(self.accuracy_train) >= 4:
-                # if accuracy is greater than 80%, stop
+                # if accuracy is greater than 95%, stop
                 break
 
             if (
@@ -151,57 +147,9 @@ class QMeans:
         )
         return np.argmin(distances, axis=1)
 
-    def plot_clusters(self, X_train, X_test):
-        centroids_x = self.centroids_[:, 0]
-        centroids_y = self.centroids_[:, 1]
-
-        fig = go.Figure()
-
-        # Ajout des points d'entraînement
-        fig.add_trace(
-            go.Scatter(
-                x=X_train[:, 0],
-                y=X_train[:, 1],
-                mode="markers",
-                marker=dict(size=5, color="orange"),
-                name="Points d'entraînement",
-            )
-        )
-
-        # Ajout des points de test
-        fig.add_trace(
-            go.Scatter(
-                x=X_test[:, 0],
-                y=X_test[:, 1],
-                mode="markers",
-                marker=dict(size=5, color="green"),
-                name="Points de test",
-            )
-        )
-
-        fig.add_trace(
-            go.Scatter(
-                x=centroids_x,
-                y=centroids_y,
-                mode="markers",
-                marker=dict(size=10, color="red", symbol="cross"),
-                name="Centroïdes",
-            )
-        )
-
-        fig.update_layout(title="Q-Means")
-
-        plot(fig, filename="images/q_kmeans_clusters.html")
-
-    @staticmethod
-    def plot_data_with_labels(X_train, iter_n, labels, centroids):
+    def plot_data_with_labels(self, X_train, return_fig=False):
         """
         Plot data with labels, and centroids with same color as labels
-        :param X_train:
-        :param iter_n:
-        :param labels:
-        :param centroids:
-        :return:
         """
         fig = go.Figure()
 
@@ -217,8 +165,7 @@ class QMeans:
             8: "gray",
         }
 
-        colors = [AssociatedColor[label] for label in labels]
-        centroids_colors = [AssociatedColor[label] for label in range(len(centroids))]
+        colors = [AssociatedColor[label] for label in self.labels_]
 
         # Ajout des points d'entraînement
         fig.add_trace(
@@ -234,17 +181,20 @@ class QMeans:
         # Ajout des centroïdes
         fig.add_trace(
             go.Scatter(
-                x=centroids[:, 0],
-                y=centroids[:, 1],
+                x=self.centroids_[:, 0],
+                y=self.centroids_[:, 1],
                 mode="markers",
-                marker=dict(size=10, color="red", symbol="cross"),
+                marker=dict(size=10, color="black", symbol="cross"),
                 name="Centroïdes",
             )
         )
 
-        fig.update_layout(title=f"Q-Means - Iteration {iter_n}")
+        fig.update_layout(title=f"Q-Means")
 
-        plot(fig, filename=f"images/q_kmeans_clusters_{iter_n}.html")
+        if return_fig:
+            return fig
+
+        plot(fig, filename=f"images/q_kmeans_clusters.html")
 
     def plot_accuracy(self):
         fig = go.Figure()

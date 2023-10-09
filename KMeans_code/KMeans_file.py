@@ -67,11 +67,25 @@ class ClassicKMeans:
             axis=1,
         )
 
-    def plot_clusters(self, X_train, X_test):
-        centroids_x = self.centroids_[:, 0]
-        centroids_y = self.centroids_[:, 1]
-
+    def plot_data_with_labels(self, X_train, return_fig=False):
+        """
+        Plot data with labels, and centroids with same color as labels
+        """
         fig = go.Figure()
+
+        AssociatedColor = {
+            0: "red",
+            1: "blue",
+            2: "green",
+            3: "black",
+            4: "purple",
+            5: "orange",
+            6: "pink",
+            7: "brown",
+            8: "gray",
+        }
+
+        colors = [AssociatedColor[label] for label in self.labels_]
 
         # Ajout des points d'entraînement
         fig.add_trace(
@@ -79,35 +93,28 @@ class ClassicKMeans:
                 x=X_train[:, 0],
                 y=X_train[:, 1],
                 mode="markers",
-                marker=dict(size=5, color="orange"),
-                name="Points d'entraînement",
+                marker=dict(size=5, color=colors),
+                showlegend=False,
             )
         )
 
-        # Ajout des points de test
+        # Ajout des centroïdes
         fig.add_trace(
             go.Scatter(
-                x=X_test[:, 0],
-                y=X_test[:, 1],
+                x=self.centroids_[:, 0],
+                y=self.centroids_[:, 1],
                 mode="markers",
-                marker=dict(size=5, color="green"),
-                name="Points de test",
-            )
-        )
-
-        fig.add_trace(
-            go.Scatter(
-                x=centroids_x,
-                y=centroids_y,
-                mode="markers",
-                marker=dict(size=10, color="red", symbol="cross"),
+                marker=dict(size=10, color="black", symbol="cross"),
                 name="Centroïdes",
             )
         )
 
-        fig.update_layout(title="Classic KMeans")
+        fig.update_layout(title=f"K-Means")
 
-        plot(fig, filename="images/qmeans_iterations.html")
+        if return_fig:
+            return fig
+
+        plot(fig, filename=f"images/kmeans_clusters.html")
 
     def plot_accuracy(self):
         fig = go.Figure()

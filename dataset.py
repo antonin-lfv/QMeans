@@ -70,6 +70,8 @@ class Kmeans_dataset:
         elif self.source == "iris":
             iris = datasets.load_iris()
             X = iris.data
+            # keep only 2 features
+            X = X[:, :2]
             y = iris.target
             self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(
                 X, y, test_size=self.test_size, random_state=self.random_state
@@ -83,14 +85,21 @@ class Kmeans_dataset:
     def get_dataset(self):
         return self.X_train, self.X_test, self.y_train, self.y_test
 
-    def plot_dataset(self):
+    def plot_dataset(self, show_split=True):
+        """
+        Plot the dataset
+
+        Parameters
+        - show_split: bool, default=True : if True, show the split between train and test data (different colors)
+        """
         fig = go.Figure()
+
         fig.add_trace(
             go.Scatter(
                 x=self.X_train[:, 0],
                 y=self.X_train[:, 1],
                 mode="markers",
-                marker=dict(size=5, color="orange"),
+                marker=dict(size=5, color="orange" if show_split else "blue"),
                 name="Points d'entraînement",
             )
         )
@@ -103,15 +112,21 @@ class Kmeans_dataset:
                 name="Points de test",
             )
         )
+
+        fig.update_layout(
+            showlegend=False,
+            template="plotly_white",
+        )
+
         plot(fig, filename="images/kmeans_data.html")
 
 
 if __name__ == "__main__":
     # Parameters
-    source = "random circle"
+    source = "iris"
     n_clusters = 2
     n_features = 2
-    n_samples = 100
+    n_samples = 150
     random_state = 17
     cluster_std = 0.05
     test_size = 0.2

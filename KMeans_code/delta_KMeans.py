@@ -2,6 +2,7 @@ import numpy as np
 from classical_utils import get_cluster_labels, compute_accuracy, euclidean_distance
 from plotly.offline import plot
 import plotly.graph_objects as go
+from dataset import Kmeans_dataset
 
 
 class DeltaKMeans:
@@ -10,7 +11,7 @@ class DeltaKMeans:
         n_clusters,
         delta_decay=None,
         max_iter=50,
-        delta_init=0.5,
+        delta_init=0.2,
         random_state=None,
     ):
         self.n_clusters = n_clusters
@@ -22,24 +23,31 @@ class DeltaKMeans:
         self.labels_ = None
         self.accuracy_train = []
 
-    def initialize_centroids(self, X):
-        n_samples = X.shape[0]
-        rng = np.random.default_rng(self.random_state)
+    def initialize_centroids_plusplus(self, X):
+        """
+        k-means++ initialization method.
+        """
+        n_samples, n_features = X.shape
+        centroids = np.zeros((self.n_clusters, n_features))
 
-        centroids_idx = [rng.choice(n_samples)]
-        for _ in range(1, self.n_clusters):
-            distance = np.sqrt(((X - X[centroids_idx][:, np.newaxis]) ** 2).sum(axis=2))
-            min_distances = np.min(
-                distance, axis=0
-            )  # distances minimales pour chaque point
-            probs = min_distances / np.sum(min_distances)  # normalisation des distances
-            centroids_idx.append(rng.choice(n_samples, p=probs))
+        # Choose the first centroid randomly
+        centroids[0] = X[np.random.choice(n_samples)]
 
-        return X[centroids_idx, :]
+        for k in range(1, self.n_clusters):
+            # Compute the squared distances from the previous centroids
+            squared_distances = np.min(
+                np.sum((X[:, np.newaxis] - centroids[:k]) ** 2, axis=2), axis=1
+            )
+            # Compute the probabilities
+            probs = squared_distances / np.sum(squared_distances)
+            # Choose the next centroid
+            centroids[k] = X[np.random.choice(n_samples, p=probs)]
+
+        self.centroids_ = centroids
 
     def fit(self, X_train, X_test, y_test):
         rng = np.random.default_rng(self.random_state)
-        self.centroids_ = self.initialize_centroids(X_train)
+        self.initialize_centroids_plusplus(X_train)
         delta = self.delta_init
         labels = None
 
@@ -96,52 +104,54 @@ class DeltaKMeans:
             axis=1,
         )
 
-    def plot_clusters(self, X_train, X_test):
-        # Extraire les coordonnées des centroïdes
-        centroids_x = self.centroids_[:, 0]
-        centroids_y = self.centroids_[:, 1]
-
-        # Créer la figure
+    def plot_data_with_labels(self, X_train, return_fig=False):
+        """
+        Plot data with labels, and centroids with same color as labels
+        """
         fig = go.Figure()
 
-        # Ajouter les points d'entraînement
+        AssociatedColor = {
+            0: "red",
+            1: "blue",
+            2: "green",
+            3: "black",
+            4: "purple",
+            5: "orange",
+            6: "pink",
+            7: "brown",
+            8: "gray",
+        }
+
+        colors = [AssociatedColor[label] for label in self.labels_]
+
+        # Ajout des points d'entraînement
         fig.add_trace(
             go.Scatter(
                 x=X_train[:, 0],
                 y=X_train[:, 1],
                 mode="markers",
-                marker=dict(size=5, color="orange"),
-                name="Points d'entraînement",
+                marker=dict(size=5, color=colors),
+                showlegend=False,
             )
         )
 
-        # Ajouter les points de test
+        # Ajout des centroïdes
         fig.add_trace(
             go.Scatter(
-                x=X_test[:, 0],
-                y=X_test[:, 1],
+                x=self.centroids_[:, 0],
+                y=self.centroids_[:, 1],
                 mode="markers",
-                marker=dict(size=5, color="green"),
-                name="Points de test",
-            )
-        )
-
-        # Ajouter les centroïdes
-        fig.add_trace(
-            go.Scatter(
-                x=centroids_x,
-                y=centroids_y,
-                mode="markers",
-                marker=dict(size=10, color="red", symbol="cross"),
+                marker=dict(size=10, color="black", symbol="cross"),
                 name="Centroïdes",
             )
         )
 
-        # Titre
-        fig.update_layout(title="delta-KMeans")
+        fig.update_layout(title=f"delta_K-Means")
 
-        # Afficher la figure
-        plot(fig, filename="images/delta_kmeans.html")
+        if return_fig:
+            return fig
+
+        plot(fig, filename=f"images/delta_kmeans_clusters.html")
 
     def plot_accuracy(self):
         fig = go.Figure()
@@ -156,6 +166,48 @@ class DeltaKMeans:
             )
         )
         fig.update_layout(
-            title=f"Accuracy classic KMeans, delta_init = {self.delta_init}"
+            title=f"Accuracy classic delta-KMeans, delta_init = {self.delta_init}"
         )
         plot(fig, filename="images/accuracy_delta_kmeans.html")
+
+
+if __name__ == "__main__":
+    # ======================== Parameters ======================== #
+    n_clusters = 3
+    n_features = 2
+    n_samples = 200
+    random_state = 42
+    cluster_std = 0.1
+    test_size = 0.1
+
+    delta_init = 0.05
+
+    # ======================== Data ======================== #
+    data = Kmeans_dataset(
+        source="random blobs",
+        n_samples=n_samples,
+        n_features=n_features,
+        n_clusters=n_clusters,
+        cluster_std=cluster_std,
+        random_state=random_state,
+        test_size=test_size,
+    )
+
+    X_train, X_test, y_train, y_test = data.get_dataset()
+
+    # data.plot_dataset()
+
+    # ======================== Model ======================== #
+
+    # Delta KMeans
+    delta_kmeans = DeltaKMeans(
+        n_clusters=n_clusters, random_state=random_state, delta_init=delta_init
+    )
+
+    # ======================== Training ======================== #
+    print("Start training Delta KMeans...")
+    delta_kmeans.fit(X_train, X_test, y_test)
+    print("Training done.")
+
+    # ======================== Results ======================== #
+    delta_kmeans.plot_data_with_labels(X_train)
