@@ -2,7 +2,7 @@ import numpy as np
 import plotly.graph_objects as go
 from plotly.offline import plot
 from classical_utils import get_cluster_labels, compute_accuracy
-from quantum_utils import (
+from quantum_utils_CLOUD import (
     distance_centroids_parallel,
     transform_distances_matrix_to_bit_matrix,
     apply_quantum_find_min,

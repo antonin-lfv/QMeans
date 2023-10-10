@@ -51,7 +51,7 @@ if __name__ == "__main__":
     print("Start training...")
     model = QMeans(n_clusters=n_clusters, max_iter=10, random_state=random_state)
     model.fit(X_train, X_test, y_test, backend=backend, shots=4096)
-    model.plot_clusters(X_train, X_test)
+    model.plot_data_with_labels(X_train)
     model.plot_accuracy()
 
     # Discussion

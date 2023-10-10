@@ -18,20 +18,20 @@ if __name__ == "__main__":
 
     # ======================== Data ======================== #
 
-    n_clusters = 3
+    n_clusters = 5
     n_features = 2
-    n_samples = 150
-    random_state = 41
-    cluster_std = 0.11
+    n_samples = 250
+    random_state = 2
+    cluster_std = 0.03
     test_size = 0.1
 
-    delta_init = 0.01
+    delta_init = 0.0005
 
     backend = IBMProvider().get_backend("ibmq_qasm_simulator")
     shots = 4096
 
     data = Kmeans_dataset(
-        source="iris",
+        source="random blobs",
         n_samples=n_samples,
         n_features=n_features,
         n_clusters=n_clusters,
