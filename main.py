@@ -18,9 +18,9 @@ if __name__ == "__main__":
 
     # ======================== Data ======================== #
 
-    n_clusters = 5
+    n_clusters = 3
     n_features = 2
-    n_samples = 250
+    n_samples = 50
     random_state = 2
     cluster_std = 0.03
     test_size = 0.1
@@ -55,7 +55,9 @@ if __name__ == "__main__":
     )
 
     # QMeans
-    qmeans = QMeans(n_clusters=n_clusters, random_state=random_state)
+    qmeans = QMeans(
+        n_clusters=n_clusters, random_state=random_state, init_method="qmeans++"
+    )
 
     # ======================== Training ======================== #
     print("Start training Classic KMeans...")

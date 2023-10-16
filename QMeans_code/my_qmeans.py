@@ -8,6 +8,7 @@ from quantum_utils_CLOUD import (
     apply_quantum_find_min,
 )
 from tqdm import tqdm
+import random
 
 
 class QMeans:
@@ -48,7 +49,7 @@ class QMeans:
 
         self.centroids_ = centroids
 
-    def initialize_centroids_plusplus(self, X):
+    def initialize_centroids_k_plusplus(self, X):
         """
         k-means++ initialization method.
         """
@@ -70,13 +71,55 @@ class QMeans:
 
         self.centroids_ = centroids
 
+    def initialize_centroids_q_plusplus(self, points, backend, shots=4096):
+        """
+        QMeans++ initialization method.
+        Using the quantum algorithm to find the minimum distance between a point and a set of points.
+        """
+        print("Start QMeans++ initialization method")
+
+        # Initialize centroids as an empty numpy array with shape (0, num_features)
+        centroids = np.empty((0, points.shape[1]))
+
+        # Step 1 : Choose the first centroid randomly
+        first_centroid = random.choice(points)
+        centroids = np.append(centroids, [first_centroid], axis=0)
+
+        # Step 2: Choose the other centroids
+        for _ in range(self.n_clusters - 1):
+            # compute the distances between each point and the closest centroid
+            distances = np.array(
+                list(
+                    map(
+                        lambda x: min(
+                            distance_centroids_parallel(x, centroids, backend, shots)
+                        ),
+                        points,
+                    )
+                )
+            )
+
+            # Compute the probabilities
+            probs = distances / np.sum(distances)
+
+            # Choose the next centroid
+            next_centroid = points[np.random.choice(a=len(points), p=probs)]
+            centroids = np.append(centroids, [next_centroid], axis=0)
+
+        self.centroids_ = centroids
+        print("End QMeans++ initialization method")
+
     def fit(self, X_train, X_test, y_test, backend=None, shots=4096):
         if self.init_method == "kmeans++":
-            self.initialize_centroids_plusplus(X_train)
+            self.initialize_centroids_k_plusplus(X_train)
+        elif self.init_method == "qmeans++":
+            self.initialize_centroids_q_plusplus(X_train, backend, shots)
         elif self.init_method == "maximin":
             self.initialize_centroids_maximin(X_train)
         else:
-            raise ValueError("Invalid init_method, must be 'kmeans++' or 'maximin'")
+            raise ValueError(
+                "Invalid init_method, must be 'kmeans++', 'qmeans++' or 'maximin'"
+            )
 
         labels = None
 
