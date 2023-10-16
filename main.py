@@ -20,7 +20,7 @@ if __name__ == "__main__":
 
     n_clusters = 3
     n_features = 2
-    n_samples = 50
+    n_samples = 150
     random_state = 2
     cluster_std = 0.03
     test_size = 0.1
