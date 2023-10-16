@@ -239,6 +239,38 @@ class QMeans:
 
         plot(fig, filename=f"images/q_kmeans_clusters.html")
 
+    def plot_data_with_clusters(self, X_train):
+        """
+        Plot data with labels, and centroids with same color as labels
+        """
+        fig = go.Figure()
+
+        # Ajout des points d'entraînement
+        fig.add_trace(
+            go.Scatter(
+                x=X_train[:, 0],
+                y=X_train[:, 1],
+                mode="markers",
+                marker=dict(size=5, color="blue"),
+                showlegend=False,
+            )
+        )
+
+        # Ajout des centroïdes
+        fig.add_trace(
+            go.Scatter(
+                x=self.centroids_[:, 0],
+                y=self.centroids_[:, 1],
+                mode="markers",
+                marker=dict(size=10, color="red", symbol="cross"),
+                name="Centroïdes",
+            )
+        )
+
+        fig.update_layout(title=f"Q-Means")
+
+        plot(fig)
+
     def plot_accuracy(self):
         fig = go.Figure()
         fig.add_trace(
