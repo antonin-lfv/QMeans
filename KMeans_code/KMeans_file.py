@@ -13,15 +13,30 @@ class ClassicKMeans:
         self.labels_ = None
         self.accuracy_train = []
 
-    def initialize_centroids(self, X):
+    def initialize_centroids_plusplus(self, X):
+        """
+        k-means++ initialization method.
+        """
         n_samples, n_features = X.shape
-        rng = np.random.default_rng(self.random_state)
+        centroids = np.zeros((self.n_clusters, n_features))
 
-        centroids_idx = rng.choice(n_samples, size=self.n_clusters, replace=False)
-        self.centroids_ = X[centroids_idx, :]
+        # Choose the first centroid randomly
+        centroids[0] = X[np.random.choice(n_samples)]
+
+        for k in range(1, self.n_clusters):
+            # Compute the squared distances from the previous centroids
+            squared_distances = np.min(
+                np.sum((X[:, np.newaxis] - centroids[:k]) ** 2, axis=2), axis=1
+            )
+            # Compute the probabilities
+            probs = squared_distances / np.sum(squared_distances)
+            # Choose the next centroid
+            centroids[k] = X[np.random.choice(n_samples, p=probs)]
+
+        self.centroids_ = centroids
 
     def fit(self, X_train, X_test, y_test):
-        self.initialize_centroids(X_train)
+        self.initialize_centroids_plusplus(X_train)
         labels = None
 
         for _ in range(self.max_iter):

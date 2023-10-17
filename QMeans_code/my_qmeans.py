@@ -99,6 +99,9 @@ class QMeans:
                 )
             )
 
+            # NOTE : We can't use minimum quantum algorithm for searching the minimum distance between
+            # a point and a set of points because we will lose the information of the real distance
+
             # Compute the probabilities
             probs = distances / np.sum(distances)
 
@@ -135,15 +138,11 @@ class QMeans:
                 )
             )
 
-            # Calcul des labels de manière classique
-            # labels = np.argmin(distances, axis=1)
-            # print(f"Labels: {labels}")
-            # Calcul des labels de manière quantique
+            # Quantize the distances matrix
             bit_matrix = transform_distances_matrix_to_bit_matrix(distances)
 
-            # On calcule le minimum quantique pour chaque point pour avoir les labels
+            # We compute the quantum minimum for each point to have the labels
             labels = np.apply_along_axis(apply_quantum_find_min, axis=1, arr=bit_matrix)
-            # print(f"Labels quantiques: {labels}")
 
             new_centroids = np.array(
                 [X_train[labels == i].mean(axis=0) for i in range(self.n_clusters)]
