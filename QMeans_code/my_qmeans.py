@@ -13,7 +13,7 @@ import random
 
 class QMeans:
     def __init__(
-        self, n_clusters, max_iter=5, random_state=None, init_method="kmeans++"
+        self, n_clusters, max_iter=10, random_state=None, init_method="kmeans++"
     ):
         self.n_clusters = n_clusters
         self.max_iter = max_iter
@@ -158,7 +158,6 @@ class QMeans:
             y_pred_test = self.predict(X_test, backend, shots)
             y_mapped_test = get_cluster_labels(y_pred_test, y_test)
             self.accuracy_train.append(compute_accuracy(y_mapped_test, y_test))
-            print(f"Accuracy: {round(self.accuracy_train[-1],3)}")
 
             if self.accuracy_train[-1] >= 0.95 and len(self.accuracy_train) >= 4:
                 # if accuracy is greater than 95%, stop
@@ -172,6 +171,8 @@ class QMeans:
             ):
                 # if accuracy does not change anymore, stop
                 break
+
+        print(f"\nAccuracies QMeans: {[round(acc, 3) for acc in self.accuracy_train]}")
 
         self.labels_ = labels
         return self

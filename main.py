@@ -14,15 +14,16 @@ warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 
 if __name__ == "__main__":
-    print("=== Starting ===")
+    print("[INFO]: Starting")
 
     # ======================== Data ======================== #
 
-    n_clusters = 3
+    source = "random circle"
+    n_clusters = 2
     n_features = 2
-    n_samples = 40
-    random_state = 2
-    cluster_std = 0.03
+    n_samples = 150
+    random_state = 301
+    cluster_std = 1.3
     test_size = 0.1
 
     delta_init = 0.0005
@@ -31,7 +32,7 @@ if __name__ == "__main__":
     shots = 4096
 
     data = Kmeans_dataset(
-        source="random blobs",
+        source=source,
         n_samples=n_samples,
         n_features=n_features,
         n_clusters=n_clusters,

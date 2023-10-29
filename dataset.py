@@ -1,5 +1,8 @@
+import random
+
 from sklearn import datasets
 from sklearn.model_selection import train_test_split
+import numpy as np
 
 import plotly.graph_objects as go
 from plotly.offline import plot
@@ -16,6 +19,10 @@ class Kmeans_dataset:
         cluster_std,
         test_size,
     ):
+        """
+        Create a dataset for KMeans.
+        Source can be "random blobs", "random moon", "random circle", "iris", "aniso" or "varied"
+        """
         self.source = source
         self.n_clusters = n_clusters
         self.n_features = n_features
@@ -62,6 +69,7 @@ class Kmeans_dataset:
                 shuffle=True,
                 noise=0.1,
                 random_state=self.random_state,
+                factor=0.5,
             )
             self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(
                 X, y, test_size=self.test_size, random_state=self.random_state
@@ -77,9 +85,34 @@ class Kmeans_dataset:
                 X, y, test_size=self.test_size, random_state=self.random_state
             )
 
+        elif self.source == "aniso":
+            X, y = datasets.make_blobs(
+                n_samples=self.n_samples,
+                random_state=self.random_state,
+                cluster_std=self.cluster_std,
+                centers=4,  # always 3 clusters
+            )
+            transformation = np.array([[0.7, -0.6], [-0.3, 0.8]])
+            X_aniso = np.dot(X, transformation)
+            self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(
+                X_aniso, y, test_size=self.test_size, random_state=self.random_state
+            )
+
+        elif self.source == "varied":
+            X, y = datasets.make_blobs(
+                n_samples=self.n_samples,
+                cluster_std=[0.1, 0.05, 0.12],
+                random_state=self.random_state,
+                center_box=(0.0, 1.0),
+            )
+            self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(
+                X, y, test_size=self.test_size, random_state=self.random_state
+            )
+
         else:
             raise ValueError(
-                "Invalid source, please choose between 'random blobs', 'random moon', 'random circle' and 'iris'"
+                "Invalid source, please choose between 'random blobs', 'random moon', 'random circle', "
+                "'iris', 'aniso' or 'varied'"
             )
 
     def get_dataset(self):
@@ -123,13 +156,13 @@ class Kmeans_dataset:
 
 if __name__ == "__main__":
     # Parameters
-    source = "iris"
-    n_clusters = 2
+    source = "aniso"
+    n_clusters = 4
     n_features = 2
     n_samples = 150
-    random_state = 17
-    cluster_std = 0.05
-    test_size = 0.2
+    random_state = 301
+    cluster_std = 1.5
+    test_size = 0.1
 
     # Chargement des données
     dataset = Kmeans_dataset(

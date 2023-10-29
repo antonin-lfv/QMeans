@@ -4,12 +4,14 @@ from qiskit.tools.visualization import circuit_drawer
 
 import plotly.graph_objects as go
 from plotly.offline import plot
+from plotly.subplots import make_subplots
 import matplotlib.pyplot as plt
 import math
 import random
 from tqdm import tqdm
 import numpy as np
 from math import pi
+import time
 
 from classical_utils import euclidean_distance
 
@@ -123,7 +125,12 @@ def int_to_bits(integer, num_bits=4):
     return format(integer, f"0{num_bits}b")
 
 
-def compare_bitstring(bitstring_a, bitstring_b, plot_circuit=False, shots=1024):
+def compare_bitstring(
+    bitstring_a, bitstring_b, plot_circuit=False, return_time=False, shots=1024
+):
+    """
+    Compare two bitstrings using quantum computing
+    """
     bits = max(
         qubits_needed(bits_to_int(bitstring_a)), qubits_needed(bits_to_int(bitstring_b))
     )
@@ -159,6 +166,7 @@ def compare_bitstring(bitstring_a, bitstring_b, plot_circuit=False, shots=1024):
 
     # Do the simulation, returning the result
     result = execute(qc, backend, shots=shots).result()
+    circuit_time = result.results[0]._metadata["metadata"]["sample_measure_time"]
 
     # get the probability distribution
     counts = result.get_counts()
@@ -166,6 +174,9 @@ def compare_bitstring(bitstring_a, bitstring_b, plot_circuit=False, shots=1024):
     if plot_circuit:
         circuit_drawer(qc, output="mpl")
         plt.show()
+
+    if return_time:
+        return counts, circuit_time
 
     return counts
 
@@ -177,7 +188,7 @@ backend = provider.get_backend("simulator_mps")
 # Test compare_bitstring
 # b1 = "11"
 # b2 = "01"
-# counts = compare_bitstring(b1, b2, plot_circuit=True)
+# counts, time_c = compare_bitstring(b1, b2, plot_circuit=True, return_time=True)
 # print(f"First bitstring: '{b1}', that is {bits_to_int(b1)}")
 # print(f"Second bitstring: '{b2}', that is {bits_to_int(b2)}")
 # print(counts)
@@ -185,6 +196,46 @@ backend = provider.get_backend("simulator_mps")
 # if '01' has higher score, then the second bitstring is smaller
 # if '10' has higher score, then the first bitstring is smaller
 # if '00' has higher score, then the bitstrings are equal
+
+
+def compare_bitstring_compare_time():
+    """
+    Compare the time of the classical and quantum compare_bitstring functions with different bits size (mean)
+    """
+    bits_size = [1, 2, 3, 4, 5, 6]
+    N = 100  # test N times for each bits size
+    classical_pourcentage = []
+    quantum_pourcentage = []
+    for j in tqdm(range(N)):
+        time_classical = []
+        time_quantum = []
+        for i in bits_size:
+            b1 = int_to_bits(2**i - 1, i)
+            b2 = int_to_bits(2**i - 2, i)
+
+            start_time = time.time()
+            _ = min(b1, b2)
+            end_time = time.time()
+            time_classical.append(end_time - start_time)
+
+            _, time_q = compare_bitstring(b1, b2, return_time=True)
+            time_quantum.append(time_q)
+
+        # Compute the pourcentage of difference between the first and the last time for both classical and quantum
+        classical_pourcentage.append(
+            (time_classical[-1] - time_classical[0])
+            / max(time_classical[0], 0.00001)
+            * 100
+        )
+        quantum_pourcentage.append(
+            (time_quantum[-1] - time_quantum[0]) / time_quantum[0] * 100
+        )
+
+    print(f"Classical pourcentage mean: {np.mean(classical_pourcentage)}")
+    print(f"Quantum pourcentage mean: {np.mean(quantum_pourcentage)}")
+
+
+# compare_bitstring_compare_time()
 
 
 def quantum_find_min(list_of_bits, shots=1024, only_index=False) -> (int, int):
