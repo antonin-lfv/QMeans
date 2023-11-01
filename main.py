@@ -14,17 +14,17 @@ warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 
 if __name__ == "__main__":
-    print("[INFO]: Starting")
+    print("[INFO]: Starting\n")
 
     # ======================== Data ======================== #
 
-    source = "random circle"
-    n_clusters = 2
+    source = "varied"
+    n_clusters = 3
     n_features = 2
     n_samples = 150
-    random_state = 301
-    cluster_std = 1.3
-    test_size = 0.1
+    random_state = 999
+    cluster_std = 0.045
+    test_size = 0.15
 
     delta_init = 0.0005
 

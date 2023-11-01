@@ -90,7 +90,7 @@ class DeltaKMeans:
             self.accuracy_train.append(compute_accuracy(y_mapped_test, y_test))
 
         print(
-            f"\nAccuracies delta KMeans: {[round(acc, 3) for acc in self.accuracy_train]}"
+            f"Accuracies delta KMeans: {[round(acc, 3) for acc in self.accuracy_train]}\n"
         )
 
         self.labels_ = labels

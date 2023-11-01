@@ -1,5 +1,3 @@
-import random
-
 from sklearn import datasets
 from sklearn.model_selection import train_test_split
 import numpy as np
@@ -99,9 +97,16 @@ class Kmeans_dataset:
             )
 
         elif self.source == "varied":
+            assert self.n_clusters in [
+                3,
+                4,
+            ], "n_clusters must be 3 or 4 for this source"
             X, y = datasets.make_blobs(
                 n_samples=self.n_samples,
-                cluster_std=[0.1, 0.05, 0.12],
+                centers=self.n_clusters,
+                cluster_std=[0.11, 0.07, 0.1, 0.04]
+                if self.n_clusters == 4
+                else [0.1, 0.05, 0.12],
                 random_state=self.random_state,
                 center_box=(0.0, 1.0),
             )
@@ -156,8 +161,8 @@ class Kmeans_dataset:
 
 if __name__ == "__main__":
     # Parameters
-    source = "aniso"
-    n_clusters = 4
+    source = "random blobs"
+    n_clusters = 3
     n_features = 2
     n_samples = 150
     random_state = 301

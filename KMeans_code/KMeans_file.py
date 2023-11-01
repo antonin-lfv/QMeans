@@ -68,7 +68,7 @@ class ClassicKMeans:
 
             self.accuracy_train.append(compute_accuracy(y_mapped_test, y_test))
 
-        print(f"\nAccuracies KMeans: {[round(acc, 3) for acc in self.accuracy_train]}")
+        print(f"Accuracies KMeans: {[round(acc, 3) for acc in self.accuracy_train]}\n")
 
         self.labels_ = labels
         return self
