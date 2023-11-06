@@ -150,7 +150,7 @@ def compare_bitstring(
             [qra[i], qrb[i], qraux[2 * i], qraux[2 * i + 1]],
         )
 
-        if i < bits - 1:
+        if i < bits - 2:
             qc.x(qraux[2 * i])
             qc.x(qraux[2 * i + 1])
             qc.mcx([qraux[2 * i], qraux[2 * i + 1]], qrint[i])
@@ -172,7 +172,10 @@ def compare_bitstring(
     counts = result.get_counts()
 
     if plot_circuit:
-        circuit_drawer(qc, output="mpl")
+        circuit_drawer(
+            qc,
+            output="mpl",
+        )
         plt.show()
 
     if return_time:
@@ -186,11 +189,11 @@ provider = IBMProvider()
 backend = provider.get_backend("simulator_mps")
 
 # Test compare_bitstring
-# b1 = "11"
-# b2 = "01"
-# counts, time_c = compare_bitstring(b1, b2, plot_circuit=True, return_time=True)
-# print(f"First bitstring: '{b1}', that is {bits_to_int(b1)}")
-# print(f"Second bitstring: '{b2}', that is {bits_to_int(b2)}")
+# a = "11"
+# b = "01"
+# counts, time_c = compare_bitstring(a, b, plot_circuit=True, return_time=True)
+# print(f"First bitstring: '{a}', that is {bits_to_int(a)}")
+# print(f"Second bitstring: '{b}', that is {bits_to_int(b)}")
 # print(counts)
 
 # if '01' has higher score, then the second bitstring is smaller
@@ -318,7 +321,7 @@ def test_quantum_find_max():
     return max_value, max_index
 
 
-def get_success_rate_min(nb_bits=5, list_size=3, nb_tests=50, shots=4096):
+def get_success_rate_min(nb_bits=3, list_size=3, nb_tests=50, shots=4096):
     """
     Get the success rate of quantum_find_min with random bitstrings
     :param nb_bits: number of bits to represent each integer
