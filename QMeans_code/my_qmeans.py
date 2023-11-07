@@ -99,9 +99,6 @@ class QMeans:
                 )
             )
 
-            # NOTE : We can't use minimum quantum algorithm for searching the minimum distance between
-            # a point and a set of points because we will lose the information of the real distance
-
             # Compute the probabilities
             probs = distances / np.sum(distances)
 
