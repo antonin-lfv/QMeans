@@ -188,7 +188,9 @@ class QMeans:
                 )
             )
         )
-        return np.argmin(distances, axis=1)
+
+        bit_matrix = transform_distances_matrix_to_bit_matrix(distances)
+        return np.apply_along_axis(apply_quantum_find_min, axis=1, arr=bit_matrix)
 
     def plot_data_with_labels(self, X_train, return_fig=False):
         """
