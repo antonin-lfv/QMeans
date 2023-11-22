@@ -186,12 +186,16 @@ def compare_bitstring(
 
 # IBMQ account
 provider = IBMProvider()
-backend = provider.get_backend("simulator_mps")
+backend = provider.get_backend(
+    "ibmq_qasm_simulator"
+)  # simulator_mps, ibmq_qasm_simulator, ibmq_perth, ibm_lagos
+# ibm_brisbane : 127 qubits (real)
+# simulator_mps : 100 qubits (simulator)
 
 # Test compare_bitstring
 # a = "11"
 # b = "01"
-# counts, time_c = compare_bitstring(a, b, plot_circuit=True, return_time=True)
+# counts, time_c = compare_bitstring(a, b, plot_circuit=False, return_time=True)
 # print(f"First bitstring: '{a}', that is {bits_to_int(a)}")
 # print(f"Second bitstring: '{b}', that is {bits_to_int(b)}")
 # print(counts)
@@ -474,7 +478,9 @@ def _binary_combinations_pos(n, index):
     return combinations_pos
 
 
-def distance_centroids_parallel(point, centroids, backend, shots=1024):
+def distance_centroids_parallel(
+    point, centroids, backend, shots=1024, return_time=False
+):
     """
     Estimates distances using quantum computer specified by backend
     Computes it in parallel for all centroids
@@ -484,6 +490,12 @@ def distance_centroids_parallel(point, centroids, backend, shots=1024):
         centroids: list of centroids, e.g. [[0.1, 0.2], [0.3, 0.4], [0.5, 0.6]] (3 centroids so list of length 3)
         backend (IBMProvider backend): backend to use
         shots (int): number of shots to use
+        return_time (bool): if True, return the circuit time
+
+    Example:
+        >>> point = [0.1, 0.2]
+        >>> centroids = [[0.1, 0.2], [0.3, 0.4], [0.5, 0.6]]
+        >>> dist = distance_centroids_parallel(point, centroids, backend, shots=1024)
     """
     k = len(centroids)
     x_point, y_point = point[0], point[1]
@@ -533,7 +545,8 @@ def distance_centroids_parallel(point, centroids, backend, shots=1024):
 
     # Register and execute job
     job = execute(qc, backend=backend, shots=shots)
-    result = job.result().get_counts(qc)
+    job_result = job.result()
+    result = job_result.get_counts(qc)
 
     distance_centroids = [0] * k
     for i in range(k):
@@ -541,6 +554,12 @@ def distance_centroids_parallel(point, centroids, backend, shots=1024):
         for key in keys_centroid_k:
             if key in result:
                 distance_centroids[i] += result[key]
+
+    if return_time:
+        circuit_time = job_result.results[0]._metadata["metadata"][
+            "sample_measure_time"
+        ]
+        return distance_centroids, circuit_time
 
     return distance_centroids
 
@@ -612,3 +631,32 @@ def distances_for_multiple_examples_tests(
 
 
 # distances_for_multiple_examples_tests(num_examples=300, verbose=False, shots=4096)
+
+
+def quantum_vs_classical_time_distances_compute():
+    """
+    Compare the time of the classical and quantum distance_centroids_parallel
+    """
+    data_point = [0.1, 0.2]
+    centroids = [[0.1, 0.2], [0.3, 0.4], [0.5, 0.6], [0.7, 0.8]]
+    # - Classical time: 0.00019216537475585938 seconds
+    # - Quantum time: 0.002270349 seconds, backend: ibmq_qasm_simulator
+
+    # classical
+    start_time = time.time()
+    for centroid in centroids:
+        _ = euclidean_distance(np.array(data_point), np.array(centroid))
+    end_time = time.time()
+    classical_time = end_time - start_time
+    print(f"- Classical time: {classical_time} seconds")
+
+    # quantum
+    backend_name = "ibm_brisbane"
+    backend = provider.get_backend(backend_name)
+    _, quantum_time = distance_centroids_parallel(
+        data_point, centroids, backend, shots=512, return_time=True
+    )
+    print(f"- Quantum time: {quantum_time} seconds, backend: {backend_name}")
+
+
+# quantum_vs_classical_time_distances_compute()

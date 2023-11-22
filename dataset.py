@@ -137,7 +137,7 @@ class Kmeans_dataset:
                 x=self.X_train[:, 0],
                 y=self.X_train[:, 1],
                 mode="markers",
-                marker=dict(size=5, color="orange" if show_split else "blue"),
+                marker=dict(size=5, color="black" if show_split else "blue"),
                 name="Points d'entraînement",
             )
         )
@@ -146,7 +146,7 @@ class Kmeans_dataset:
                 x=self.X_test[:, 0],
                 y=self.X_test[:, 1],
                 mode="markers",
-                marker=dict(size=5, color="blue"),
+                marker=dict(size=5, color="black"),
                 name="Points de test",
             )
         )
@@ -162,11 +162,11 @@ class Kmeans_dataset:
 if __name__ == "__main__":
     # Parameters
     source = "random blobs"
-    n_clusters = 3
+    n_clusters = 5
     n_features = 2
     n_samples = 150
-    random_state = 301
-    cluster_std = 1.5
+    random_state = 303
+    cluster_std = 0.03
     test_size = 0.1
 
     # Chargement des données

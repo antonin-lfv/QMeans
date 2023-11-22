@@ -99,6 +99,9 @@ class QMeans:
                 )
             )
 
+            # We use the classical minimum to compute the minimum because the quantum one need integers
+            # and if we use integers, we lose distances
+
             # Compute the probabilities
             probs = distances / np.sum(distances)
 
