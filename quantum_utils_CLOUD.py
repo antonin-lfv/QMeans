@@ -1,10 +1,14 @@
-from qiskit import QuantumCircuit, execute, QuantumRegister, ClassicalRegister
+from qiskit import (
+    QuantumCircuit,
+    execute,
+    QuantumRegister,
+    ClassicalRegister,
+)
 from qiskit_ibm_provider import IBMProvider
 from qiskit.tools.visualization import circuit_drawer
 
 import plotly.graph_objects as go
 from plotly.offline import plot
-from plotly.subplots import make_subplots
 import matplotlib.pyplot as plt
 import math
 import random
@@ -47,12 +51,12 @@ def apply_quantum_find_min(row):
     # Convertir la ligne en liste de chaînes de bits
     list_of_bits = row.tolist()
     # Appeler quantum_find_min et retourner seulement l'index
-    index = quantum_find_min(list_of_bits, only_index=True, shots=4096)
+    index = quantum_find_min(list_of_bits, only_index=True, shots=100)
     return index
 
 
 # ======================================================================================================================
-# Find the minimum of a list of integers using quantum computing
+# Find the minimum of a list of integers using quantum computing and bitstrings comparator
 # ======================================================================================================================
 
 
@@ -129,7 +133,30 @@ def compare_bitstring(
     bitstring_a, bitstring_b, plot_circuit=False, return_time=False, shots=1024
 ):
     """
-    Compare two bitstrings using quantum computing
+    Compare two bitstrings using quantum computing.
+
+    Parameters:
+        bitstring_a: first bitstring to compare, e.g. "101"
+        bitstring_b: second bitstring to compare, e.g. "010"
+        plot_circuit: if True, plot the circuit
+        return_time: if True, return the circuit time
+        shots: number of shots to perform
+
+    Example:
+        >>> bitstring_a = "101"
+        >>> bitstring_b = "010"
+        >>> counts = compare_bitstring(bitstring_a, bitstring_b, plot_circuit=False)
+        >>> print(counts)
+        {'01': 1024}
+
+    Return:
+        counts: dict, counts of the different results of the comparison
+        time: float, time of the circuit execution (if return_time=True)
+
+    Interpretation of the results:
+        - If '01' has higher score, then the second bitstring is smaller
+        - If '10' has higher score, then the first bitstring is smaller
+        - If '00' has higher score, then the bitstrings are equal
     """
     bits = max(
         qubits_needed(bits_to_int(bitstring_a)), qubits_needed(bits_to_int(bitstring_b))
@@ -184,14 +211,6 @@ def compare_bitstring(
     return counts
 
 
-# IBMQ account
-provider = IBMProvider()
-backend = provider.get_backend(
-    "ibmq_qasm_simulator"
-)  # simulator_mps, ibmq_qasm_simulator, ibmq_perth, ibm_lagos
-# ibm_brisbane : 127 qubits (real)
-# simulator_mps : 100 qubits (simulator)
-
 # Test compare_bitstring
 # a = "11"
 # b = "01"
@@ -203,6 +222,40 @@ backend = provider.get_backend(
 # if '01' has higher score, then the second bitstring is smaller
 # if '10' has higher score, then the first bitstring is smaller
 # if '00' has higher score, then the bitstrings are equal
+
+
+def accuracy_compare_bitstring(n_times=100, bits=4, shots=10):
+    """
+    Compare n times 2 random bitstrings and compute the accuracy of the comparison
+
+    Results:
+        - 70% accuracy with 100 tests, 4 bits, 1024 shots
+        - 67% accuracy with 100 tests, 4 bits, 2048 shots
+        - 74% accuracy with 100 tests, 4 bits, 100 shots
+        - 78% accuracy with 100 tests, 4 bits, 10 shots
+        - 73% accuracy with 100 tests, 4 bits, 1 shots
+
+        - 74% accuracy with 100 tests, 3 bits, 1 shots
+
+        - 72% accuracy with 100 tests, 5 bits, 1 shots
+
+        - 69% accuracy with 100 tests, 6 bits, 1 shots
+    """
+    nb_success = 0
+    for _ in tqdm(range(n_times)):
+        a = int_to_bits(random.randint(0, 2**bits - 1), bits)
+        b = int_to_bits(random.randint(0, 2**bits - 1), bits)
+        counts = compare_bitstring(a, b, shots=shots)
+        # get the most frequent result
+        result = max(counts, key=counts.get)
+        if result == "01" and bits_to_int(a) > bits_to_int(b):
+            nb_success += 1
+        elif result == "10" and bits_to_int(a) < bits_to_int(b):
+            nb_success += 1
+        elif result == "00" and bits_to_int(a) == bits_to_int(b):
+            nb_success += 1
+
+    print(f"Accuracy: {round((nb_success / n_times)*100, 3)}")
 
 
 def compare_bitstring_compare_time():
@@ -245,7 +298,7 @@ def compare_bitstring_compare_time():
 # compare_bitstring_compare_time()
 
 
-def quantum_find_min(list_of_bits, shots=1024, only_index=False) -> (int, int):
+def quantum_find_min(list_of_bits, shots=100, only_index=False) -> (int, int):
     """
     Find the minimum bitstring in a list of bitstrings and return its index
     :param list_of_bits: list of bitstrings to compare e.g. ["0101", "0100", "0110", "0010", "1001"]
@@ -306,7 +359,7 @@ def quantum_find_max(list_of_bits, shots=1024, only_index=False) -> (int, int):
 # Test quantum_find_min
 def test_quantum_find_min():
     bitstrings = ["1101", "0010", "1110", "0110", "0101", "1111", "1011"]
-    min_value, min_index = quantum_find_min(bitstrings, shots=4096)
+    min_value, min_index = quantum_find_min(bitstrings, shots=100)
     print(f"Bitstring : {[bits_to_int(bitstring) for bitstring in bitstrings]}")
     print(
         f"The minimum bitstring is: {bitstrings[min_index]}, with value {min_value} and index {min_index}"
@@ -325,7 +378,7 @@ def test_quantum_find_max():
     return max_value, max_index
 
 
-def get_success_rate_min(nb_bits=3, list_size=3, nb_tests=50, shots=4096):
+def get_success_rate_min(nb_bits=3, list_size=3, nb_tests=50, shots=5):
     """
     Get the success rate of quantum_find_min with random bitstrings
     :param nb_bits: number of bits to represent each integer
@@ -346,7 +399,7 @@ def get_success_rate_min(nb_bits=3, list_size=3, nb_tests=50, shots=4096):
     return nb_success / nb_tests
 
 
-# get_success_rate_min(4, 5, 50, 4096)
+# get_success_rate_min(4, 5, 50, 5)
 
 
 # Success rate with find_min
@@ -660,3 +713,11 @@ def quantum_vs_classical_time_distances_compute():
 
 
 # quantum_vs_classical_time_distances_compute()
+
+
+if __name__ == "__main__":
+    # IBMQ account
+    provider = IBMProvider()
+    backend = provider.get_backend(
+        "simulator_mps"
+    )  # simulator_mps, ibmq_qasm_simulator
