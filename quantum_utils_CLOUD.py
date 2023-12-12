@@ -5,7 +5,7 @@ from qiskit import (
     ClassicalRegister,
 )
 from qiskit_ibm_provider import IBMProvider
-from qiskit.tools.visualization import circuit_drawer
+from qiskit.tools.visualization import circuit_drawer, plot_histogram
 
 import plotly.graph_objects as go
 from plotly.offline import plot
@@ -81,7 +81,7 @@ def encode(bit, plot_circuit=False):
     return qc
 
 
-def encode_bitstring(bitstring, plot_circuit=True):
+def encode_bitstring(bitstring, plot_circuit=False):
     bits = len(bitstring)
     qr = QuantumRegister(bits, "bit")
     qc = QuantumCircuit(qr)
@@ -119,14 +119,13 @@ def bits_to_int(bits):
     return int(bits, 2)
 
 
-def int_to_bits(integer, num_bits=4):
+def int_to_bits(integer):
     """
-    Convert an integer to a bitstring
+    Convert an integer to a bitstring using the minimum number of bits
     :param integer: integer to convert
-    :param num_bits: number of bits to represent the integer
     :return: bitstring representation of integer
     """
-    return format(integer, f"0{num_bits}b")
+    return format(integer, "b")
 
 
 def compare_bitstring(
@@ -243,8 +242,8 @@ def accuracy_compare_bitstring(n_times=100, bits=4, shots=10):
     """
     nb_success = 0
     for _ in tqdm(range(n_times)):
-        a = int_to_bits(random.randint(0, 2**bits - 1), bits)
-        b = int_to_bits(random.randint(0, 2**bits - 1), bits)
+        a = int_to_bits(random.randint(0, 2**bits - 1))
+        b = int_to_bits(random.randint(0, 2**bits - 1))
         counts = compare_bitstring(a, b, shots=shots)
         # get the most frequent result
         result = max(counts, key=counts.get)
@@ -270,8 +269,8 @@ def compare_bitstring_compare_time():
         time_classical = []
         time_quantum = []
         for i in bits_size:
-            b1 = int_to_bits(2**i - 1, i)
-            b2 = int_to_bits(2**i - 2, i)
+            b1 = int_to_bits(2**i - 1)
+            b2 = int_to_bits(2**i - 2)
 
             start_time = time.time()
             _ = min(b1, b2)
@@ -390,7 +389,7 @@ def get_success_rate_min(nb_bits=3, list_size=3, nb_tests=50, shots=5):
     nb_success = 0
     for _ in tqdm(range(nb_tests)):
         list_of_ints = [random.randint(0, 2**nb_bits - 1) for _ in range(list_size)]
-        list_of_bits = [int_to_bits(integer, nb_bits) for integer in list_of_ints]
+        list_of_bits = [int_to_bits(integer) for integer in list_of_ints]
         min_value, min_index = quantum_find_min(list_of_bits, shots=shots)
         if min_value == min(list_of_ints):
             nb_success += 1
@@ -470,7 +469,7 @@ def get_success_rate_max(nb_bits=5, list_size=3, nb_tests=50, shots=4096):
     nb_success = 0
     for _ in tqdm(range(nb_tests)):
         list_of_ints = [random.randint(0, 2**nb_bits - 1) for _ in range(list_size)]
-        list_of_bits = [int_to_bits(integer, nb_bits) for integer in list_of_ints]
+        list_of_bits = [int_to_bits(integer) for integer in list_of_ints]
         max_value, max_index = quantum_find_max(list_of_bits, shots=shots)
         if max_value == max(list_of_ints):
             nb_success += 1
@@ -490,13 +489,208 @@ def get_success_rate_max(nb_bits=5, list_size=3, nb_tests=50, shots=4096):
 # Pourcentage de réussite avec une liste de 3 elements sur 4 bits : 0.82 (50 tests)
 
 
+# ===== New version =====
+
+
+def bit_compare_new():
+    qr = QuantumRegister(2, "bits")
+    aux = QuantumRegister(2, "aux")
+
+    qc = QuantumCircuit(qr, aux)
+    qc.x(qr[1])
+    qc.mcx(qr, aux[0])
+    qc.x(qr[0])
+    qc.x(qr[1])
+    qc.mcx(qr, aux[1])
+
+    return qc
+
+
+def reverse_bit_compare_new():
+    qr = QuantumRegister(2, "bits")
+    aux = QuantumRegister(2, "aux")
+
+    qc = QuantumCircuit(qr, aux)
+    qc.mcx(qr, aux[1])
+    qc.x(qr[0])
+    qc.x(qr[1])
+    qc.mcx(qr, aux[0])
+    qc.x(qr[1])
+
+    return qc
+
+
+def compare_integers(n_bits, a="101", b="010", plot_circuit=False):
+    """
+    Compare two integers using quantum computing.
+
+    Parameters:
+        n_bits: min number of bits to represent each integer
+        a: first integer to compare, e.g. "101"
+        b: second integer to compare, e.g. "010"
+        plot_circuit: if True, plot the circuit
+    """
+    # Ajuster les chaînes de bits pour qu'elles aient une longueur n_bits
+    a = a.rjust(n_bits, "0")
+    b = b.rjust(n_bits, "0")
+
+    # Création des registres quantiques
+    bits_a = QuantumRegister(n_bits, "bits_a")
+    bits_b = QuantumRegister(n_bits, "bits_b")
+    # Utiliser un seul qubit auxiliaire pour le résultat final
+    aux = QuantumRegister(
+        3, "aux"
+    )  # Deux pour la comparaison, un pour le résultat final
+    qc = QuantumCircuit(bits_a, bits_b, aux)
+
+    # Ajouter un registre classique pour la mesure
+    cr = ClassicalRegister(1, "cr")
+    qc.add_register(cr)
+
+    # Utiliser un qubit auxiliaire supplémentaire pour indiquer une différence découverte
+    diff_found = QuantumRegister(1, "diff_found")
+    qc.add_register(diff_found)
+
+    # Encodage des entiers à comparer
+    qc.append(encode_bitstring(a).to_instruction(), bits_a)
+    qc.append(encode_bitstring(b).to_instruction(), bits_b)
+
+    # Boucle pour comparer chaque bit
+    for i in range(n_bits):
+        # 1) Appliquer la comparaison bit par bit
+        qc_compare = bit_compare_new()
+        qc.append(qc_compare.to_instruction(), [bits_a[i], bits_b[i], aux[0], aux[1]])
+
+        """
+        # Sans verification
+        # 2) Appliquer la porte X contrôlée conditionnellement
+        # Si aux[1] (le résultat de la comparaison actuelle) est à 1, et aux[2] (le résultat final) est à 0, mettre aux[2] à 1
+        qc.x(aux[1])
+        qc.mcx([aux[1], aux[0]], aux[2])
+        qc.x(aux[1])  # Restaurer l'état original de aux[1] si nécessaire
+        """
+
+        # Avec verification
+        # 2) Si aucune différence n'a été trouvée auparavant, effectuer la comparaison
+        qc.x(diff_found[0])
+        qc.x(aux[1])
+        qc.mcx(
+            [diff_found[0], aux[0], aux[1]], aux[2]
+        )  # Mise à jour conditionnelle du qubit de résultat
+        qc.mcx([aux[0], aux[1], aux[2]], diff_found[0])
+        qc.x(aux[0])
+        qc.x(aux[1])
+        qc.mcx([diff_found[0], aux[0], aux[1]], aux[2])
+        # Si une différence est trouvée dans cette comparaison, mettre diff_found à 1
+        qc.mcx([aux[0], aux[1], aux[2]], diff_found[0])
+        qc.x(aux[0])
+        qc.x(diff_found[0])
+
+        # 3) Inverser la comparaison pour réinitialiser les qubits auxiliaires
+        qc_reverse_compare = reverse_bit_compare_new()
+        qc.append(
+            qc_reverse_compare.to_instruction(),
+            [bits_a[i], bits_b[i], aux[0], aux[1]],
+        )
+
+    # Mesure du qubit aux[2] qui contient le résultat final de la comparaison
+    qc.measure(aux[2], cr[0])
+
+    # Afficher le circuit si demandé
+    if plot_circuit:
+        qc.draw(output="mpl")
+        plt.show()
+
+    return qc
+
+
+"""
+provider = IBMProvider()
+backend = provider.get_backend("ibmq_qasm_simulator")
+
+a = '111'
+b = '000'
+qubits_needed_num = max(len(a), len(b))
+qc = compare_integers(qubits_needed_num, a, b, plot_circuit=True)
+result = execute(qc, backend, shots=1).result()
+counts = result.get_counts()
+result = max(counts, key=counts.get)
+if result == "1":
+    print(
+        f"The first integer {bits_to_int(a)} ({a}) is greater than {bits_to_int(b)} ({b})"
+    )
+elif result == "0":
+    print(
+        f"The first integer {bits_to_int(a)} ({a}) is smaller or equal than {bits_to_int(b)} ({b})"
+    )
+"""
+
+# comparairing a with b:
+# If '1' has higher score, then a > b
+# If '0' has higher score, then a <= b
+
+
+def test_compare_integers(number_of_bits):
+    """
+    2 entiers sur 1 bits: 100% d'accuracy
+    2 entiers sur 2 bits: 100% d'accuracy
+    2 entiers sur 3 bits: 99% d'accuracy
+    2 entiers sur 4 bits: 70% d'accuracy
+    2 entiers sur 5 bits: 72% d'accuracy
+    """
+    number_of_tests = 100
+    nb_success = 0
+    for _ in tqdm(range(number_of_tests)):
+        a = int_to_bits(random.randint(0, 2**number_of_bits - 1))
+        b = int_to_bits(random.randint(0, 2**number_of_bits - 1))
+        qc = compare_integers(number_of_bits, a, b, plot_circuit=False)
+        result = execute(qc, backend, shots=1).result()
+        counts = result.get_counts()
+        # get the most frequent result
+        result = max(counts, key=counts.get)
+        if result == "1" and bits_to_int(a) > bits_to_int(b):
+            nb_success += 1
+        elif result == "0" and bits_to_int(a) <= bits_to_int(b):
+            nb_success += 1
+        else:
+            print(f"Error : response is {result} with a='{a}' and b='{b}'")
+    print(f"Accuracy: {round((nb_success / number_of_tests)*100, 3)}")
+    return round((nb_success / number_of_tests) * 100, 3)
+
+
+def test_all_possibilities(number_of_bits):
+    # test all comparison of int on number_of_bits
+    number_of_tests = 2**number_of_bits
+    nb_success = 0
+    for i in tqdm(range(number_of_tests)):
+        a = int_to_bits(i)
+        for j in range(number_of_tests):
+            b = int_to_bits(j)
+            qc = compare_integers(number_of_bits, a, b, plot_circuit=False)
+            result = execute(qc, backend, shots=1).result()
+            counts = result.get_counts()
+            # get the most frequent result
+            result = max(counts, key=counts.get)
+            if result == "1" and bits_to_int(a) > bits_to_int(b):
+                nb_success += 1
+            elif result == "0" and bits_to_int(a) <= bits_to_int(b):
+                nb_success += 1
+            else:
+                print(f"Error : response is {result} with a='{a}' and b='{b}'")
+
+
+provider = IBMProvider()
+backend = provider.get_backend("simulator_mps")
+# accuracy = test_compare_integers(1)
+test_all_possibilities(1)
+
 # ======================================================================================================================
 # Compute distance two vectors using quantum computing
 # ======================================================================================================================
 
 
 def _encode_feature(x):
-    """ "
+    """
     We map data feature values to \theta and \\phi values using this equation:
         \\phi = (x + 1) \frac{\\pi}{2},
     where \\phi is the phase and \theta the angle
