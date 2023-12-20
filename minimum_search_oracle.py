@@ -143,6 +143,16 @@ if __name__ == "__main__":
     # test_all_possibilities(3)
 
     # Show the circuit
-    qc = compare_integers(3, "101", "010")
+    qc = compare_integers(4, "1", "0")
+    qc.draw(output="mpl")
+    plt.show()
+
+    # show bit compare
+    qc = bit_compare()
+    qc.draw(output="mpl")
+    plt.show()
+
+    # show reverse bit compare
+    qc = reverse_bit_compare()
     qc.draw(output="mpl")
     plt.show()
