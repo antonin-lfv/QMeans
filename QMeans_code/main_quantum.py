@@ -53,9 +53,3 @@ if __name__ == "__main__":
     model.fit(X_train, X_test, y_test, backend=backend, shots=4096)
     model.plot_data_with_labels(X_train)
     model.plot_accuracy()
-
-    # Discussion
-    # - Si il y a que 2 entiers dans la liste, et qu'il y a un zero, il trouve jamais le bon minimum
-    # - On est limité par la taille du circuit
-    # - Obligé de convertir les distances en entiers, puis les convertir en petit entiers pour que ça
-    # rentre dans le circuit

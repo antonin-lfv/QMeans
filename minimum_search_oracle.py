@@ -1,6 +1,34 @@
-from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, execute
-from qiskit_ibm_provider import IBMProvider
+from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, transpile
+from qiskit.visualization import plot_histogram
 import matplotlib.pyplot as plt
+from math import log2, ceil
+from qiskit_ionq import IonQProvider
+from qiskit_ibm_runtime import QiskitRuntimeService, Sampler, Options
+from config import IBM_QUANTUM_API_TOKEN, IONQ_API_TOKEN
+
+
+# UTILS
+
+
+def int_to_bits(integer):
+    """
+    Convert an integer to a bitstring using the minimum number of bits
+    :param integer: integer to convert
+    :return: bitstring representation of integer
+    """
+    return format(integer, "b")
+
+
+def qubits_needed(n):
+    if n < 0:
+        raise ValueError("Le nombre doit être non négatif")
+    elif n == 0:
+        return 1  # Un qubit est nécessaire pour représenter 0
+    else:
+        return ceil(log2(n + 1))
+
+
+# COMPARAISON DE DEUX ENTIERS
 
 
 def bit_compare():
@@ -46,6 +74,20 @@ def encode(bit, plot_circuit=False):
 
 
 def compare_integers(n_bits=3, a="101", b="010"):
+    """
+
+    :param n_bits: int, nombre de bits pour la comparaison
+    :param a: str, chaîne de bits représentant le premier entier
+    :param b: str, chaîne de bits représentant le deuxième entier
+
+    Architecture du circuit:
+
+    - 2 registres quantiques Qa et Qb pour les deux entiers à comparer (2 * n_bits qubits)
+    - 2 registres quantiques Qaux1 et Qaux2 pour les résultats intermédiaires (2 * n_bits qubits)
+    - 1 registre quantique Qres pour les résultats de la comparaison (n_bits - 1 qubits)
+    - 1 registre quantique Qfin pour le résultat final (1 qubit)
+    - 1 registre classique Cout pour le résultat final (classique)
+    """
     # Ajuster les chaînes de bits pour qu'elles aient une longueur n_bits
     a = a.rjust(n_bits, "0")
     b = b.rjust(n_bits, "0")
@@ -90,15 +132,26 @@ def compare_integers(n_bits=3, a="101", b="010"):
 
     # 3/ remontée des résultats
     for i in reversed(range(n_bits - 1)):
-        qc.mcx([Qaux1[i + 1], Qres[i]], Qaux1[i])
         qc.mcx([Qaux2[i + 1], Qres[i]], Qaux2[i])
 
     # modification: retour pour un bit pour l'ordre (à inverser si besoin)
     # 4/ copie de Qaux2[0]: 1=> dans l'ordre, 0 => supérieur ou égal
     qc.mcx([Qaux2[0]], Qfin)
 
+    # 5/ inverse remontée des résultats
+    for i in range(n_bits - 1):
+        qc.mcx([Qaux2[i + 1], Qres[i]], Qaux2[i])
+
+    # 6/ inverse des iCCNOT
+    for i in range(n_bits - 1):
+        qc.x(Qaux1[i])
+        qc.x(Qaux2[i])
+        qc.mcx([Qaux1[i], Qaux2[i]], Qres[i])
+        qc.x(Qaux1[i])
+        qc.x(Qaux2[i])
+
     # faire uncompute ici pour libérer les 3n registres temporaires
-    # 5/ uncompute avec reverse_bit_compare_new()
+    # 7/ uncompute avec reverse_bit_compare_new()
     for i in reversed(range(n_bits)):
         qc_compare = reverse_bit_compare()
         qc.append(qc_compare.to_instruction(), [Qa[i], Qb[i], Qaux1[i], Qaux2[i]])
@@ -109,9 +162,13 @@ def compare_integers(n_bits=3, a="101", b="010"):
     return qc
 
 
-def test_all_possibilities(number_of_bits):
+# TESTS
+
+
+def check_all_possibilities(number_of_bits):
     """
     Teste toutes les possibilités pour une comparaison de 2 entiers sur n_bits
+    Utilise la fonction compare_integers pour comparer tous les entiers de 0 à 2**n_bits - 1
 
     Parameters:
         number_of_bits: nombre de bits pour la comparaison, pour que les entiers soient codés sur n_bits
@@ -128,7 +185,8 @@ def test_all_possibilities(number_of_bits):
                 end="",
             )
             qc = compare_integers(number_of_bits, a, b)
-            result = execute(qc, backend, shots=1).result()
+            qc = transpile(qc, backend)
+            result = backend.run(qc, shots=1).result()
             out = [*result.get_counts()]
             print(f"{i} {operator[out[0]]} {j}", end="")
             if ((i < j) and (out[0] == "1")) or ((i >= j) and (out[0] == "0")):
@@ -138,21 +196,17 @@ def test_all_possibilities(number_of_bits):
 
 
 if __name__ == "__main__":
-    provider = IBMProvider()
-    backend = provider.get_backend("simulator_mps")
-    # test_all_possibilities(3)
+    platform = "IONQ"
+    if platform == "IBM":
+        print("IBM")
+        # Load saved credentials
+        service = QiskitRuntimeService()
+        backend = service.backend("simulator_mps")
+    elif platform == "IONQ":
+        print("IONQ")
 
-    # Show the circuit
-    qc = compare_integers(4, "1", "0")
-    qc.draw(output="mpl")
-    plt.show()
+        provider = IonQProvider(IONQ_API_TOKEN)
+        backend = provider.get_backend("ionq_simulator")
 
-    # show bit compare
-    qc = bit_compare()
-    qc.draw(output="mpl")
-    plt.show()
-
-    # show reverse bit compare
-    qc = reverse_bit_compare()
-    qc.draw(output="mpl")
-    plt.show()
+    # Test de toutes les possibilités pour une comparaison de 2 entiers sur 3 bits
+    check_all_possibilities(3)

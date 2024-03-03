@@ -1,5 +1,4 @@
 numpy
-sklearn
 plotly
 fastdist
 scikit-learn
