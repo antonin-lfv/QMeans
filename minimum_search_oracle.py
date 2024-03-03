@@ -162,6 +162,156 @@ def compare_integers(n_bits=3, a="101", b="010"):
     return qc
 
 
+def oracle_compare_integers(Qa, Qb, Qaux1, Qaux2, Qres, Qfin, n_bits):
+    """
+    Crée un oracle pour comparer deux entiers a et b sur n_bits
+    Pour cela, il suffit de remplacer la grande porte CX par une porte CZ
+    Et de supprimer le qubit de sortie classique
+    :param Qa: QuantumRegister, registre quantique pour le premier entier (n_bits qubits préparés)
+    :param Qb: QuantumRegister, registre quantique pour le deuxième entier (n_bits qubits préparés)
+    :param Qaux1: QuantumRegister, registre quantique pour les résultats intermédiaires (n_bits qubits)
+    :param Qaux2: QuantumRegister, registre quantique pour les résultats intermédiaires (n_bits qubits)
+    :param Qres: QuantumRegister, registre quantique pour les résultats de la comparaison (n_bits - 1 qubits)
+    :param Qfin: QuantumRegister, registre quantique pour le résultat final (1 qubit)
+    :param n_bits: int, nombre de bits pour la comparaison
+    """
+    # circuit quantique
+    qc = QuantumCircuit(Qa, Qb, Qaux1, Qaux2, Qres, Qfin)
+
+    # circuit original du papier de Oliveira et Ramos
+    # 1/ comparaison Uc
+    for i in range(n_bits):
+        # Appliquer la comparaison bit par bit
+        qc_compare = bit_compare()
+        qc.append(qc_compare.to_instruction(), [Qa[i], Qb[i], Qaux1[i], Qaux2[i]])
+
+    # 2/ portes iCCNOT (test de non égalité de qubit Qaux1/2)
+    for i in range(n_bits - 1):
+        qc.x(Qaux1[i])
+        qc.x(Qaux2[i])
+        qc.mcx([Qaux1[i], Qaux2[i]], Qres[i])
+        qc.x(Qaux1[i])
+        qc.x(Qaux2[i])
+
+    # 3/ remontée des résultats
+    for i in reversed(range(n_bits - 1)):
+        qc.mcx([Qaux2[i + 1], Qres[i]], Qaux2[i])
+
+    # modification: retour pour un bit pour l'ordre (à inverser si besoin)
+    # 4/ On remplace la grande porte CX par une porte CZ
+    qc.cz([Qaux2[0]], Qfin)
+
+    # 5/ inverse remontée des résultats
+    for i in range(n_bits - 1):
+        qc.mcx([Qaux2[i + 1], Qres[i]], Qaux2[i])
+
+    # 6/ inverse des iCCNOT
+    for i in range(n_bits - 1):
+        qc.x(Qaux1[i])
+        qc.x(Qaux2[i])
+        qc.mcx([Qaux1[i], Qaux2[i]], Qres[i])
+        qc.x(Qaux1[i])
+        qc.x(Qaux2[i])
+
+    # faire uncompute ici pour libérer les 3n registres temporaires
+    # 7/ Décalcul avec Uc-1
+    for i in reversed(range(n_bits)):
+        qc_compare = reverse_bit_compare()
+        qc.append(qc_compare.to_instruction(), [Qa[i], Qb[i], Qaux1[i], Qaux2[i]])
+
+    return qc
+
+
+# PRÉPARATION DES ÉTATS SUPERPOSÉS (GROVER)
+
+
+def oracle_grover_preparation(n_bits, L, Qa, Qfin):
+    """
+    Crée un oracle pour la recherche d'éléments en vue de les amplifier
+    La superposition de n qubits va créer une superposition de 2**n états, mais notre liste L ne va pas contenir
+    tous ces états. Il faut donc créer un oracle pour marquer les états de L dans cette superposition
+    Pour cela on va créer un oracle qui va prendre en entrée un n-qubit et un qubit auxiliaire, et qui va
+    appliquer une porte Z sur le qubit auxiliaire si l'entrée est dans L (avec une porte MCX)
+    Si L[0] = 4 et n_bits = 3, alors l'oracle doit marquer l'état 100 donc la première porte Z doit être appliquée
+    sur le 4e qubit si le premier qubit est à 1, le deuxième à 0 et le troisième à 0.
+
+    Parametres:
+    :param n_bits: nombre de bits sur lesquels les entiers sont codés
+    :param L: liste des entiers à marquer dans la superposition
+    :param Qa: QuantumRegister, registre quantique pour les entiers à comparer (n_bits qubits)
+    :param Qfin: QuantumRegister, registre quantique du qubit auxiliaire sur lequel appliquer la porte Z (1 qubit)
+    """
+    # circuit quantique
+    qc = QuantumCircuit(Qa, Qfin)
+
+    # Création de l'oracle
+    for integer in L:
+        # Création de l'oracle
+        # On crée un masque pour marquer l'entier dans la superposition
+        mask = format(integer, f"0{n_bits}b")
+        # On applique une porte Z sur le qubit auxiliaire si l'entrée est dans L
+        qc.mcx([Qa[i] for i in range(n_bits) if mask[i] == "1"], Qfin)
+
+    return qc
+
+
+# OPERATEUR DE DIFFUSION
+
+
+def diffusion_operator(n_bits, Qa, Qfin):
+    """
+    Crée un opérateur de diffusion pour amplifier les états marqués par l'oracle
+    :param n_bits: nombre de bits sur lesquels les entiers sont codés
+    :param Qa: QuantumRegister, registre quantique pour les entiers à comparer (n_bits qubits) (superposés)
+    :param Qfin: QuantumRegister, registre quantique du qubit auxiliaire sur lequel appliquer la porte Z (1 qubit)
+    """
+
+
+# MAIN CIRCUIT
+
+
+def minimum_search_circuit(L):
+    """
+    Circuit pour la recherche du minimum dans une liste d'entiers L
+    :param L: list, liste des entiers parmi lesquels chercher le minimum
+    :return: le minimum de L
+    """
+    # Nombre de bits nécessaires pour représenter les entiers de L
+    n_bits = qubits_needed(max(L))
+
+    # résultat
+    min_L = None
+
+    # Registre quantique pour les entiers à comparer
+    Qa = QuantumRegister(n_bits, "a")
+    # Registre quantique pour yi (b)
+    Qb = QuantumRegister(n_bits, "b")
+    # Registres quantiques pour les résultats intermédiaires
+    Qaux1 = QuantumRegister(n_bits, "aux1")
+    Qaux2 = QuantumRegister(n_bits, "aux2")
+    # Registre quantique pour les résultats de la comparaison
+    Qres = QuantumRegister(n_bits - 1, "res")
+    # Qubit auxiliaire initialisé à ket(-)
+    Qfin = QuantumRegister(1, "fin")
+    # Registre classique pour le résultat (on mesure les n qubits de Qa)
+    Cout = ClassicalRegister(n_bits, "cr")
+
+    qc = QuantumCircuit(Qa, Qb, Qaux1, Qaux2, Qres, Qfin, Cout)
+
+    # -- Superposition des n qubits de Qa --
+    qc.h(Qa)
+
+    # -- Préparation des états superposés pour la recherche de minimum (porte G répété g fois) --
+
+    # -- Comparaison des états superposés avec l'entier b (porte P répétée p fois) --
+
+    # -- Mesure des qubits de Qa --
+
+    # -- On regarde le résultat de la mesure pour trouver le minimum --
+
+    return min_L
+
+
 # TESTS
 
 
