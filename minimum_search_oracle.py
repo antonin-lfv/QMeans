@@ -1,10 +1,13 @@
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, transpile
+from qiskit.circuit.library.standard_gates import ZGate
 from qiskit.visualization import plot_histogram
 import matplotlib.pyplot as plt
 from math import log2, ceil
 from qiskit_ionq import IonQProvider
 from qiskit_ibm_runtime import QiskitRuntimeService, Sampler, Options
 from config import IBM_QUANTUM_API_TOKEN, IONQ_API_TOKEN
+
+# IMPORTANT : Ce code utilise la nouvelle version de qiskit (1.0.1)
 
 
 # UTILS
@@ -266,14 +269,39 @@ def diffusion_operator(n_bits, Qa, Qfin):
     :param Qfin: QuantumRegister, registre quantique du qubit auxiliaire sur lequel appliquer la porte Z (1 qubit)
     """
 
+    qc = QuantumCircuit(Qa, Qfin)
+
+    # Appliquer H à tous les qubits dans Qa
+    qc.h(Qa)
+
+    # Appliquer X à tous les qubits dans Qa
+    qc.x(Qa)
+
+    # Appliquer une porte Z conditionnelle sur l'état |0...0> en utilisant le qubit auxiliaire
+    # Pour cela, on peut utiliser une porte Z multi-contrôlée
+    # En Qiskit, on doit créer un ZGate et utiliser la méthode .control() pour obtenir une version contrôlée
+    z_gate = ZGate().control(n_bits)
+    qc.append(z_gate, Qa[:] + [Qfin[0]])
+
+    # Réappliquer les portes X et H à tous les qubits dans Qa
+    qc.x(Qa)
+    qc.h(Qa)
+
+    return qc
+
 
 # MAIN CIRCUIT
 
 
-def minimum_search_circuit(L):
+def minimum_search_circuit(L, show_circuit=False, transpile_plot=False):
     """
     Circuit pour la recherche du minimum dans une liste d'entiers L
+
+    Parametres:
     :param L: list, liste des entiers parmi lesquels chercher le minimum
+    :param show_circuit: bool, afficher le circuit
+    :param transpile_plot: bool, afficher le circuit transpilé
+
     :return: le minimum de L
     """
     # Nombre de bits nécessaires pour représenter les entiers de L
@@ -286,10 +314,10 @@ def minimum_search_circuit(L):
     Qa = QuantumRegister(n_bits, "a")
     # Registre quantique pour yi (b)
     Qb = QuantumRegister(n_bits, "b")
-    # Registres quantiques pour les résultats intermédiaires
+    # Registres quantiques pour les résultats intermédiaires (oracle comparaison de P)
     Qaux1 = QuantumRegister(n_bits, "aux1")
     Qaux2 = QuantumRegister(n_bits, "aux2")
-    # Registre quantique pour les résultats de la comparaison
+    # Registre quantique pour les résultats de la comparaison (oracle comparaison de P)
     Qres = QuantumRegister(n_bits - 1, "res")
     # Qubit auxiliaire initialisé à ket(-)
     Qfin = QuantumRegister(1, "fin")
@@ -302,12 +330,34 @@ def minimum_search_circuit(L):
     qc.h(Qa)
 
     # -- Préparation des états superposés pour la recherche de minimum (porte G répété g fois) --
+    # On applique l'oracle pour marquer les états de L dans la superposition
+    qc.append(
+        oracle_grover_preparation(n_bits, L, Qa, Qfin).to_instruction(), [*Qa, *Qfin]
+    )
+    # On applique l'opérateur de diffusion pour amplifier les états marqués par l'oracle
+    qc.append(diffusion_operator(n_bits, Qa, Qfin).to_instruction(), [*Qa, *Qfin])
 
     # -- Comparaison des états superposés avec l'entier b (porte P répétée p fois) --
+    # On applique l'oracle pour comparer les entiers superposés avec l'entier b
+    # TODO
+    # On applique l'opérateur de diffusion pour amplifier les états marqués par l'oracle
+    # TODO
 
     # -- Mesure des qubits de Qa --
+    qc.measure(Qa, Cout)
+
+    # -- Show circuit --
+    if show_circuit:
+        if transpile_plot:
+            transpile(qc, backend).draw(output="mpl")
+        else:
+            qc.draw(output="mpl")
+        plt.show()
 
     # -- On regarde le résultat de la mesure pour trouver le minimum --
+    # On exécute le circuit
+    qc = transpile(qc, backend)
+    # TODO
 
     return min_L
 
@@ -359,4 +409,6 @@ if __name__ == "__main__":
         backend = provider.get_backend("ionq_simulator")
 
     # Test de toutes les possibilités pour une comparaison de 2 entiers sur 3 bits
-    check_all_possibilities(3)
+    # check_all_possibilities(3)
+
+    minimum_search_circuit([3, 5], show_circuit=True, transpile_plot=False)
