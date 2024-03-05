@@ -584,7 +584,7 @@ if __name__ == "__main__":
 
     minimum_search_circuit(
         L,
-        yi=21,
+        yi=4,
         G=True,
         P=True,
         show_circuit=False,
