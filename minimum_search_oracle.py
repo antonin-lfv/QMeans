@@ -284,7 +284,6 @@ def oracle_grover_preparation(n_bits, L, Qa, Qfin):
         # Création de l'oracle
         # On crée un masque pour marquer l'entier dans la superposition
         mask = format(integer, f"0{n_bits}b")
-        mask = mask[::-1]  # On inverse le masque pour l'appliquer dans l'ordre
         # On applique des portes NOT (X) sur les qubits qui doivent être à 0 pour qu'il passe à 1
         for i in range(n_bits):
             if mask[i] == "0":
@@ -389,6 +388,7 @@ def minimum_search_circuit(
 
     # Nombre de bits nécessaires pour représenter les entiers de L
     n_bits = max(qubits_needed(max(L)), 2)
+    print(f"Nombre de bits nécessaires pour représenter les entiers de L: {n_bits}\n")
 
     # Registre quantique pour les entiers à comparer
     Qa = QuantumRegister(n_bits, "a")
@@ -430,13 +430,14 @@ def minimum_search_circuit(
     # -- Préparation des états superposés pour la recherche de minimum (porte G répété g fois) --
     if G:
         # g=sqrt(2^n/N) où N est le nombre d'éléments dans L et n est le nombre de qubits
-        g = int((pi / 4) * (2**n_bits / len(L)) ** 0.5)
+        # g = max(int(round((pi / 4) * (2**n_bits / len(L)) ** 0.5)), 1)
+        g = 2
         print(f"Nombre d'itérations de G: {g}")
         for i in range(g):
             # On applique l'oracle pour marquer les états de L dans la superposition
             qc.append(
-                oracle_grover_preparation(n_bits, L, Qa, Qfin).to_instruction(),
-                [*Qa, *Qfin],
+                oracle_grover_preparation(n_bits, L, Qa[::-1], Qfin).to_instruction(),
+                [*Qa[::-1], *Qfin],
             )
             # On applique l'opérateur de diffusion pour amplifier les états marqués par l'oracle
             qc.append(diffusion_operator(Qa).to_instruction(), [*Qa])
@@ -444,16 +445,16 @@ def minimum_search_circuit(
     # -- Comparaison des états superposés avec l'entier b (porte P répétée p fois) --
     if P:
         # p=sqrt(N) où N est le nombre d'éléments dans L
-        # p = max(int((pi / 4) * (2**n_bits / len(L)) ** 0.5) - 1, 1)
-        p = 1
+        # p = max(int(round((pi / 4) * (2**n_bits / len(L)) ** 0.5)) - 1, 1)
+        p = 2
         print(f"Nombre d'itérations de P: {p}\n")
         for i in range(p):
             # On applique l'oracle pour comparer les entiers superposés avec l'entier b
             qc.append(
                 oracle_compare_integers(
-                    Qa, Qb, Qaux1, Qaux2, Qres, Qfin, n_bits
+                    Qa[::-1], Qb, Qaux1, Qaux2, Qres, Qfin, n_bits
                 ).to_instruction(),
-                [*Qa, *Qb, *Qaux1, *Qaux2, *Qres, *Qfin],
+                [*Qa[::-1], *Qb, *Qaux1, *Qaux2, *Qres, *Qfin],
             )
             # On applique l'opérateur de diffusion pour amplifier les états marqués par l'oracle
             qc.append(diffusion_operator(Qa).to_instruction(), [*Qa])
@@ -507,15 +508,18 @@ def minimum_search_circuit(
             title=f"L = {L}; yi = {bits_to_int(yi)}; min_L = {min_L}; vrai minimum = {min(L)}",
             xaxis_title="Entiers",
             yaxis_title="Nombre d'occurences",
+            # font
+            font=dict(family="Noto Sans", size=25, color="black"),
         )
 
-        fig.add_annotation(
-            x=min_L,
-            y=counts[format(min_L, f"0{n_bits}b")] / sum(counts.values()),
-            text="minimum",
-            showarrow=True,
-            arrowhead=1,
-        )
+        if P:
+            fig.add_annotation(
+                x=min_L,
+                y=counts[format(min_L, f"0{n_bits}b")] / sum(counts.values()),
+                text="minimum",
+                showarrow=True,
+                arrowhead=1,
+            )
 
         plot(fig, filename="minimum_search.html")
 
@@ -572,15 +576,13 @@ if __name__ == "__main__":
     # check_all_possibilities(3)
 
     # Test de la recherche du minimum dans une liste L
-    L = [3, 5, 7]
-    """for i in L:
-        minimum_search_circuit([3, 5, 2, 1, 0, 4, 8], yi=i)"""
+    L = [6, 19, 17, 3, 4, 16, 12, 8, 21, 4]
 
     minimum_search_circuit(
         L,
-        yi=2,
+        yi=21,
         G=True,
-        P=False,
+        P=True,
         show_circuit=False,
         transpile_plot=False,
         show_hist=True,

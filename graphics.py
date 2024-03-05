@@ -14,7 +14,9 @@ n_range = np.linspace(1, max_nN, num_val)  # n de 1 à 20
 N, n = np.meshgrid(N_range, n_range)
 
 # Calcul de la complexité pour chaque paire (N, n)
-complexity = np.maximum((np.pi / 4) * np.sqrt(2**n / N), np.sqrt(N))
+complexity = np.maximum(
+    (np.pi / 4) * np.sqrt(2**n / N), (np.pi / 4) * np.sqrt(N) - 0.5
+)
 
 min_complexity_quantum = np.min(complexity)
 max_complexity_quantum = np.max(complexity)
