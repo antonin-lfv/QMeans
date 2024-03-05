@@ -1,8 +1,9 @@
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, transpile
 from qiskit.circuit.library.standard_gates import ZGate
+from qiskit.circuit.library import MCMT
 from qiskit.visualization import plot_histogram
 import matplotlib.pyplot as plt
-from math import log2, ceil
+from math import log2, ceil, pi
 from qiskit_ionq import IonQProvider
 from qiskit_ibm_runtime import QiskitRuntimeService, Sampler, Options
 from config import IBM_QUANTUM_API_TOKEN, IONQ_API_TOKEN
@@ -213,7 +214,7 @@ def oracle_compare_integers(Qa, Qb, Qaux1, Qaux2, Qres, Qfin, n_bits):
 
     # modification: retour pour un bit pour l'ordre (à inverser si besoin)
     # 4/ On remplace la grande porte CX par une porte CZ
-    qc.cz([Qaux2[0]], Qfin)
+    qc.cz(Qaux2[0], Qfin)
 
     # 5/ inverse remontée des résultats
     for i in range(n_bits - 1):
@@ -283,6 +284,7 @@ def oracle_grover_preparation(n_bits, L, Qa, Qfin):
         # Création de l'oracle
         # On crée un masque pour marquer l'entier dans la superposition
         mask = format(integer, f"0{n_bits}b")
+        mask = mask[::-1]  # On inverse le masque pour l'appliquer dans l'ordre
         # On applique des portes NOT (X) sur les qubits qui doivent être à 0 pour qu'il passe à 1
         for i in range(n_bits):
             if mask[i] == "0":
@@ -299,18 +301,18 @@ def oracle_grover_preparation(n_bits, L, Qa, Qfin):
     return qc
 
 
-def show_oracle_grover_preparation(n_bits=2):
+def show_oracle_grover_preparation(L, transpile_plot=False):
     """
     Affiche le circuit de l'oracle pour la recherche d'éléments en vue de les amplifier
-    :param n_bits: int, nombre de bits pour la comparaison
     """
+    n_bits = max(qubits_needed(max(L)), 2)
     Qa = QuantumRegister(n_bits, "a")
     Qfin = QuantumRegister(1, "fin")
-    L = [3]
 
     qc = oracle_grover_preparation(n_bits, L, Qa, Qfin)
 
-    qc = transpile(qc, backend)
+    if transpile_plot:
+        qc = transpile(qc, backend)
     qc.draw(output="mpl")
     plt.show()
 
@@ -318,25 +320,28 @@ def show_oracle_grover_preparation(n_bits=2):
 # OPERATEUR DE DIFFUSION
 
 
-def diffusion_operator(Qa, Qfin):
+def diffusion_operator(Qa):
     """
     Crée un opérateur de diffusion pour amplifier les états marqués par l'oracle
     :param Qa: QuantumRegister, registre quantique pour les entiers à comparer (n_bits qubits) (superposés)
-    :param Qfin: QuantumRegister, registre quantique du qubit auxiliaire sur lequel appliquer la porte Z (1 qubit)
     """
-
-    qc = QuantumCircuit(Qa, Qfin)
+    qc = QuantumCircuit(Qa)
 
     # Appliquer H à tous les qubits dans Qa
     qc.h(Qa)
 
-    # Appliquer Z à tous les qubits dans Qa
-    qc.z(Qa)
+    # Appliquer X à tous les qubits dans Qa
+    qc.x(Qa)
 
-    # Appliquer CZ avec le premier qubit de Qa comme contrôle et Qfin comme cible
-    qc.cz(Qa[0], Qfin)
+    # Appliquer une porte Z conditionnelle sur l'état |0...0> (après application des portes X, c'est l'état |1...1>)
+    # Pour cela, on applique une porte H sur le dernier qubit pour le préparer à la porte Z conditionnelle
+    qc.h(Qa[-1])
+    # Appliquer une porte Z conditionnelle (CZ) simulée par MCX avec inversion sur le dernier qubit
+    qc.mcx(Qa[:-1], Qa[-1])  # Utilise tous sauf le dernier qubit comme contrôle
+    qc.h(Qa[-1])  # Appliquer H sur le dernier qubit pour compléter la simulation
 
-    # Appliquer H à tous les qubits dans Qa
+    # Réappliquer les portes X et H à tous les qubits dans Qa
+    qc.x(Qa)
     qc.h(Qa)
 
     return qc
@@ -348,9 +353,8 @@ def show_diffusion_operator(n_bits=2):
     :param n_bits: int, nombre de bits pour la comparaison
     """
     Qa = QuantumRegister(n_bits, "a")
-    Qfin = QuantumRegister(1, "fin")
 
-    qc = diffusion_operator(Qa, Qfin)
+    qc = diffusion_operator(Qa)
 
     qc = transpile(qc, backend)
     qc.draw(output="mpl")
@@ -384,10 +388,7 @@ def minimum_search_circuit(
     print(f"On cherche le minimum dans la liste: {L}\n")
 
     # Nombre de bits nécessaires pour représenter les entiers de L
-    n_bits = qubits_needed(max(L))
-
-    # résultat
-    min_L = None
+    n_bits = max(qubits_needed(max(L)), 2)
 
     # Registre quantique pour les entiers à comparer
     Qa = QuantumRegister(n_bits, "a")
@@ -415,18 +416,21 @@ def minimum_search_circuit(
         print(f"Valeur de yi (aléatoire): {yi}")
     else:
         print(f"Valeur de yi (venant de l'itération précédente): {yi}")
-
     # On transforme yi en une chaîne de bits (avec n_bits)
+    assert yi < 2**n_bits, f"yi doit être inférieur à 2**n_bits : {2**n_bits}"
     yi = int_to_bits(yi).rjust(n_bits, "0")
-
     # On encode yi dans Qb
     for i in range(n_bits):
         qc.append(encode(yi[i]).to_instruction(), [Qb[i]])
 
+    # -- Initialisation de Qfin (qubit auxiliaire) à ket(-)=H.X|0> --
+    qc.x(Qfin)
+    qc.h(Qfin)
+
     # -- Préparation des états superposés pour la recherche de minimum (porte G répété g fois) --
     if G:
         # g=sqrt(2^n/N) où N est le nombre d'éléments dans L et n est le nombre de qubits
-        g = int(round((2**n_bits / len(L)) ** 0.5))
+        g = int((pi / 4) * (2**n_bits / len(L)) ** 0.5)
         print(f"Nombre d'itérations de G: {g}")
         for i in range(g):
             # On applique l'oracle pour marquer les états de L dans la superposition
@@ -435,12 +439,13 @@ def minimum_search_circuit(
                 [*Qa, *Qfin],
             )
             # On applique l'opérateur de diffusion pour amplifier les états marqués par l'oracle
-            qc.append(diffusion_operator(Qa, Qfin).to_instruction(), [*Qa, *Qfin])
+            qc.append(diffusion_operator(Qa).to_instruction(), [*Qa])
 
     # -- Comparaison des états superposés avec l'entier b (porte P répétée p fois) --
     if P:
         # p=sqrt(N) où N est le nombre d'éléments dans L
-        p = int(round(len(L) ** 0.5))
+        # p = max(int((pi / 4) * (2**n_bits / len(L)) ** 0.5) - 1, 1)
+        p = 1
         print(f"Nombre d'itérations de P: {p}\n")
         for i in range(p):
             # On applique l'oracle pour comparer les entiers superposés avec l'entier b
@@ -451,7 +456,7 @@ def minimum_search_circuit(
                 [*Qa, *Qb, *Qaux1, *Qaux2, *Qres, *Qfin],
             )
             # On applique l'opérateur de diffusion pour amplifier les états marqués par l'oracle
-            qc.append(diffusion_operator(Qa, Qfin).to_instruction(), [*Qa, *Qfin])
+            qc.append(diffusion_operator(Qa).to_instruction(), [*Qa])
 
     # -- Mesure des qubits de Qa --
     qc.measure(Qa, Cout)
@@ -482,31 +487,36 @@ def minimum_search_circuit(
         # Utiliser plotly pour un affichage interactif
         # Colorer en rouge les elements de L
         # Ajouter une annotation pour indiquer le minimum
+        # Afficher les probabilités pour chaque entier (au lieu du nombre d'occurences)
         fig = go.Figure(
             data=[
                 go.Bar(
                     x=[int(k, 2) for k in counts.keys()],
-                    y=list(counts.values()),
+                    y=[v / sum(counts.values()) for v in counts.values()],
                     marker=dict(
                         color=[
-                            "red" if int(k, 2) in L else "blue" for k in counts.keys()
+                            "deepskyblue" if int(k, 2) in L else "darkgray"
+                            for k in counts.keys()
                         ]
                     ),
                 )
             ]
         )
+
         fig.update_layout(
-            title=f"L = {L}; yi = {bits_to_int(yi)}; min_L",
-            xaxis_title="Entier",
+            title=f"L = {L}; yi = {bits_to_int(yi)}; min_L = {min_L}; vrai minimum = {min(L)}",
+            xaxis_title="Entiers",
             yaxis_title="Nombre d'occurences",
         )
+
         fig.add_annotation(
             x=min_L,
-            y=counts[str(format(min_L, f"0{n_bits}b"))],
-            text=f"Minimum: {min_L}",
+            y=counts[format(min_L, f"0{n_bits}b")] / sum(counts.values()),
+            text="minimum",
             showarrow=True,
             arrowhead=1,
         )
+
         plot(fig, filename="minimum_search.html")
 
     return min_L
@@ -546,7 +556,7 @@ def check_all_possibilities(number_of_bits):
 
 
 if __name__ == "__main__":
-    platform = "IONQ"
+    platform = "IBM"
     if platform == "IBM":
         print("IBM")
         # Load saved credentials
@@ -562,20 +572,20 @@ if __name__ == "__main__":
     # check_all_possibilities(3)
 
     # Test de la recherche du minimum dans une liste L
-    L = [7, 2, 6]
-    # for i in L:
-    #     minimum_search_circuit([3, 5, 2, 1, 0, 4, 8], yi=i)
+    L = [3, 5, 7]
+    """for i in L:
+        minimum_search_circuit([3, 5, 2, 1, 0, 4, 8], yi=i)"""
 
-    """minimum_search_circuit(
+    minimum_search_circuit(
         L,
-        yi=3,
+        yi=2,
         G=True,
         P=False,
         show_circuit=False,
         transpile_plot=False,
         show_hist=True,
-    )"""
+    )
 
     # show_oracle_compare_integers(3)
-    # show_oracle_grover_preparation(2)
-    show_diffusion_operator(2)
+    # show_oracle_grover_preparation(L)
+    # show_diffusion_operator(4)

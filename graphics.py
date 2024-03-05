@@ -14,12 +14,12 @@ n_range = np.linspace(1, max_nN, num_val)  # n de 1 à 20
 N, n = np.meshgrid(N_range, n_range)
 
 # Calcul de la complexité pour chaque paire (N, n)
-complexity = np.maximum(np.sqrt(2**n / N), np.sqrt(N))
+complexity = np.maximum((np.pi / 4) * np.sqrt(2**n / N), np.sqrt(N))
 
 min_complexity_quantum = np.min(complexity)
 max_complexity_quantum = np.max(complexity)
 
-"""fig = go.Figure(
+fig = go.Figure(
     data=go.Heatmap(
         z=complexity,
         x=N_range,
@@ -35,7 +35,7 @@ fig.update_layout(
     font=dict(size=25, color="black", family="Noto Sans"),
 )
 
-plot(fig, filename="complexity_heatmap.html")"""
+plot(fig, filename="complexity_heatmap.html")
 
 # Avec contour plot quantum computing
 fig = go.Figure(
@@ -81,7 +81,7 @@ complexity_classic = N_classic  # La complexité est simplement O(N)
 
 # gradient bar from min_complexity_quantum to max_complexity_quantum
 
-"""fig = go.Figure(
+fig = go.Figure(
     data=go.Heatmap(
         z=complexity_classic,
         x=N_range_classic,
@@ -98,7 +98,7 @@ fig.update_layout(
     font=dict(size=25, color="black", family="Noto Sans"),
 )
 
-plot(fig, filename="complexity_heatmap_classic.html")"""
+plot(fig, filename="complexity_heatmap_classic.html")
 
 # Avec contour plot classical computing
 fig = go.Figure(
