@@ -1,12 +1,10 @@
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, transpile
 from qiskit.circuit.library.standard_gates import ZGate
-from qiskit.circuit.library import MCMT
-from qiskit.visualization import plot_histogram
 import matplotlib.pyplot as plt
 from math import log2, ceil, pi
 from qiskit_ionq import IonQProvider
-from qiskit_ibm_runtime import QiskitRuntimeService, Sampler, Options
-from config import IBM_QUANTUM_API_TOKEN, IONQ_API_TOKEN
+from qiskit_ibm_runtime import QiskitRuntimeService
+from config import IONQ_API_TOKEN
 import plotly.graph_objects as go
 from plotly.offline import plot
 
@@ -333,7 +331,6 @@ def diffusion_operator(Qa):
 
     # Appliquer H à tous les qubits dans Qa
     qc.h(Qa)
-
     # Appliquer X à tous les qubits dans Qa
     qc.x(Qa)
 
@@ -344,8 +341,9 @@ def diffusion_operator(Qa):
     qc.mcx(Qa[:-1], Qa[-1])  # Utilise tous sauf le dernier qubit comme contrôle
     qc.h(Qa[-1])  # Appliquer H sur le dernier qubit pour compléter la simulation
 
-    # Réappliquer les portes X et H à tous les qubits dans Qa
+    # Réappliquer les portes X à tous les qubits dans Qa
     qc.x(Qa)
+    # Réappliquer les portes H à tous les qubits dans Qa
     qc.h(Qa)
 
     return qc
@@ -360,7 +358,7 @@ def show_diffusion_operator(n_bits=2):
 
     qc = diffusion_operator(Qa)
 
-    qc = transpile(qc, backend)
+    # qc = transpile(qc, backend)
     qc.draw(output="mpl")
     plt.show()
 
@@ -369,7 +367,15 @@ def show_diffusion_operator(n_bits=2):
 
 
 def minimum_search_circuit(
-    L, yi=None, show_circuit=False, transpile_plot=False, show_hist=True, G=True, P=True
+    L,
+    yi=None,
+    show_circuit=False,
+    transpile_plot=False,
+    show_hist=True,
+    G=True,
+    P=True,
+    g=None,
+    p=None,
 ):
     """
     Circuit pour la recherche du minimum dans une liste d'entiers L
@@ -382,18 +388,22 @@ def minimum_search_circuit(
     :param show_hist: bool, afficher l'histogramme des résultats
     :param G: bool, appliquer l'opérateur de préparation des états superposés (G)
     :param P: bool, appliquer l'opérateur de comparaison des entiers superposés avec l'entier b (P)
+    :param g: int, nombre d'itérations de G (si None, on utilise la formule)
+    :param p: int, nombre d'itérations de P (si None, on utilise la formule)
 
     :return: le minimum de L suivant la valeur yi
     """
-    assert len(L) > 0, "La liste ne doit pas être vide"
+    assert len(L) > 1, "La liste doit contenir au moins 2 entiers"
     assert all(isinstance(x, int) for x in L), "La liste doit contenir des entiers"
     assert isinstance(yi, int) or yi is None, "yi doit être un entier ou None"
 
-    print(f"On cherche le minimum dans la liste: {L}\n")
+    print("--- Données ---")
+    print(f"L: {L}")
 
     # Nombre de bits nécessaires pour représenter les entiers de L
-    n_bits = max(qubits_needed(max(L)), 2)
-    print(f"Nombre de bits nécessaires pour représenter les entiers de L: {n_bits}\n")
+    n_bits = qubits_needed(max(L))
+
+    print(f"n_bits = {n_bits}\nN = {len(L)}\n")
 
     # Registre quantique pour les entiers à comparer
     Qa = QuantumRegister(n_bits, "a")
@@ -412,21 +422,26 @@ def minimum_search_circuit(
     qc = QuantumCircuit(Qa, Qb, Qaux1, Qaux2, Qres, Qfin, Cout)
 
     # -- Superposition des n qubits de Qa --
-    qc.h(Qa)
+    qc.h(Qa[::-1])
 
     # -- Initialisation de Qb (yi) --
+    print("--- Initialisation ---")
     if yi is None:
         # Si yi n'est pas donné, on choisit une valeur aléatoire
         yi = L[0]
-        print(f"Valeur de yi (aléatoire): {yi}")
+        print(f"yi (aléatoire): {yi}\n")
     else:
-        print(f"Valeur de yi (venant de l'itération précédente): {yi}")
-    # On transforme yi en une chaîne de bits (avec n_bits)
+        print(f"yi (itération précédente): {yi}\n")
+
     assert yi < 2**n_bits, f"yi doit être inférieur à 2**n_bits : {2**n_bits}"
+
+    # On transforme yi en une chaîne de bits (avec n_bits)
     yi = int_to_bits(yi).rjust(n_bits, "0")
     # On encode yi dans Qb
     for i in range(n_bits):
         qc.append(encode(yi[i]).to_instruction(), [Qb[i]])
+
+    print(f"--- Oracles ---")
 
     # -- Initialisation de Qfin (qubit auxiliaire) à ket(-)=H.X|0> --
     qc.x(Qfin)
@@ -434,9 +449,10 @@ def minimum_search_circuit(
 
     # -- Préparation des états superposés pour la recherche de minimum (porte G répété g fois) --
     if G:
-        # g=pi/4*sqrt(2^n/N) où N est le nombre d'éléments dans L et n est le nombre de qubits
-        g = max(int(round((pi / 4) * (2**n_bits / len(L)) ** 0.5)), 1)
-        print(f"Nombre d'itérations de G: {g}")
+        if g is None:
+            # g=pi/4*sqrt(2^n/N) où N est le nombre d'éléments dans L et n est le nombre de qubits
+            g = max(int(round((pi / 4) * (2**n_bits / len(L)) ** 0.5)), 1) + 1
+        print(f"Itérations de G: {g}")
         for i in range(g):
             # On applique l'oracle pour marquer les états de L dans la superposition
             qc.append(
@@ -444,14 +460,15 @@ def minimum_search_circuit(
                 [*Qa[::-1], *Qfin],
             )
             # On applique l'opérateur de diffusion pour amplifier les états marqués par l'oracle
-            qc.append(diffusion_operator(Qa).to_instruction(), [*Qa])
+            qc.append(diffusion_operator(Qa[::-1]).to_instruction(), [*Qa[::-1]])
 
     # -- Comparaison des états superposés avec l'entier b (porte P répétée p fois) --
     if P:
-        # p=g-1 où N est le nombre d'éléments dans L
-        p = max(int(round((pi / 4) * (2**n_bits / len(L)) ** 0.5)) - 1, 1)
-        # TODO : trouver le bon nombre d'itérations pour P
-        print(f"Nombre d'itérations de P: {p}\n")
+        if p is None:
+            # p=g-1 où N est le nombre d'éléments dans L
+            p = max(int(round((pi / 4) * (2**n_bits / len(L)) ** 0.5)), 1)
+            # TODO : trouver le bon nombre d'itérations pour P
+        print(f"Itérations de P: {p}")
         for i in range(p):
             # On applique l'oracle pour comparer les entiers superposés avec l'entier b
             qc.append(
@@ -461,7 +478,7 @@ def minimum_search_circuit(
                 [*Qa[::-1], *Qb, *Qaux1, *Qaux2, *Qres, *Qfin],
             )
             # On applique l'opérateur de diffusion pour amplifier les états marqués par l'oracle
-            qc.append(diffusion_operator(Qa).to_instruction(), [*Qa])
+            qc.append(diffusion_operator(Qa[::-1]).to_instruction(), [*Qa[::-1]])
 
     # -- Mesure des qubits de Qa --
     qc.measure(Qa, Cout)
@@ -475,20 +492,18 @@ def minimum_search_circuit(
         plt.show()
 
     # -- On regarde le résultat de la mesure pour trouver le minimum --
+    print("\n--- Resultats ---")
     # On exécute le circuit
     qc = transpile(qc, backend)
     result = backend.run(qc, shots=4096).result()
     counts = result.get_counts()
 
     min_L = int(max(counts, key=counts.get), 2)
-    print(f"Minimum de L pour yi = {bits_to_int(yi)}: {min_L}\n")
+    print(f"Minimum quantique: {min_L}")
+    print(f"Vrai minimum: {min(L)}")
 
     # -- Affichage de la distribution des résultats --
     if show_hist:
-        """plot_histogram(
-            counts, figsize=(20, 10), title=f"L = {L}; yi = {bits_to_int(yi)}; min_L"
-        )
-        plt.show()"""
         # Utiliser plotly pour un affichage interactif
         # Colorer en rouge les elements de L
         # Ajouter une annotation pour indiquer le minimum
@@ -509,7 +524,9 @@ def minimum_search_circuit(
         )
 
         fig.update_layout(
-            title=f"L = {L}; yi = {bits_to_int(yi)}; min_L = {min_L}; vrai minimum = {min(L)}",
+            title=f"L = {L}; yi = {bits_to_int(yi)}; "
+            f"min_L = {min_L}; vrai minimum = {min(L)}; "
+            f"n_bits = {n_bits}; N = {len(L)}",
             xaxis_title="Entiers",
             yaxis_title="Nombre d'occurences",
             # font
@@ -566,7 +583,7 @@ def check_all_possibilities(number_of_bits):
 if __name__ == "__main__":
     platform = "IBM"
     if platform == "IBM":
-        print("IBM")
+        print("Using IBM platform...\n")
         # Load saved credentials
         service = QiskitRuntimeService()
         backend = service.backend("simulator_mps")
@@ -580,13 +597,15 @@ if __name__ == "__main__":
     # check_all_possibilities(3)
 
     # Test de la recherche du minimum dans une liste L
-    L = [6, 19, 17, 3, 4, 16, 12, 8, 21, 4]
+    L = [1, 7, 3]
 
     minimum_search_circuit(
         L,
-        yi=4,
-        G=True,
+        yi=5,
+        G=False,
         P=True,
+        g=3,
+        p=2,
         show_circuit=False,
         transpile_plot=False,
         show_hist=True,
