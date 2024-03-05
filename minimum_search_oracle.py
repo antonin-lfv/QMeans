@@ -213,8 +213,10 @@ def oracle_compare_integers(Qa, Qb, Qaux1, Qaux2, Qres, Qfin, n_bits):
         qc.mcx([Qaux2[i + 1], Qres[i]], Qaux2[i])
 
     # modification: retour pour un bit pour l'ordre (à inverser si besoin)
-    # 4/ On remplace la grande porte CX par une porte CZ
-    qc.cz(Qaux2[0], Qfin)
+    # 4/ Porte controlée Z sur Qfin si Qaux2[0] est à 1 (Z = H.X.H)
+    qc.h(Qfin)
+    qc.mcx([Qaux2[0]], Qfin)
+    qc.h(Qfin)
 
     # 5/ inverse remontée des résultats
     for i in range(n_bits - 1):
@@ -278,6 +280,9 @@ def oracle_grover_preparation(n_bits, L, Qa, Qfin):
     """
     # circuit quantique
     qc = QuantumCircuit(Qa, Qfin)
+
+    # On doit supprimer les occurences multiples dans L sinon la porte Z va s'annuler (si le nombre est pair)
+    L = list(set(L))
 
     # Création de l'oracle
     for integer in L:
@@ -429,9 +434,8 @@ def minimum_search_circuit(
 
     # -- Préparation des états superposés pour la recherche de minimum (porte G répété g fois) --
     if G:
-        # g=sqrt(2^n/N) où N est le nombre d'éléments dans L et n est le nombre de qubits
-        # g = max(int(round((pi / 4) * (2**n_bits / len(L)) ** 0.5)), 1)
-        g = 2
+        # g=pi/4*sqrt(2^n/N) où N est le nombre d'éléments dans L et n est le nombre de qubits
+        g = max(int(round((pi / 4) * (2**n_bits / len(L)) ** 0.5)), 1)
         print(f"Nombre d'itérations de G: {g}")
         for i in range(g):
             # On applique l'oracle pour marquer les états de L dans la superposition
@@ -444,9 +448,9 @@ def minimum_search_circuit(
 
     # -- Comparaison des états superposés avec l'entier b (porte P répétée p fois) --
     if P:
-        # p=sqrt(N) où N est le nombre d'éléments dans L
-        # p = max(int(round((pi / 4) * (2**n_bits / len(L)) ** 0.5)) - 1, 1)
-        p = 2
+        # p=g-1 où N est le nombre d'éléments dans L
+        p = max(int(round((pi / 4) * (2**n_bits / len(L)) ** 0.5)) - 1, 1)
+        # TODO : trouver le bon nombre d'itérations pour P
         print(f"Nombre d'itérations de P: {p}\n")
         for i in range(p):
             # On applique l'oracle pour comparer les entiers superposés avec l'entier b
