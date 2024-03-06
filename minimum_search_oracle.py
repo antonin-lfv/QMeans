@@ -1,12 +1,12 @@
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, transpile
-from qiskit.circuit.library.standard_gates import ZGate
 import matplotlib.pyplot as plt
-from math import log2, ceil, pi
+from math import log2, ceil
 from qiskit_ionq import IonQProvider
 from qiskit_ibm_runtime import QiskitRuntimeService
 from config import IONQ_API_TOKEN
 import plotly.graph_objects as go
 from plotly.offline import plot
+import random
 
 # IMPORTANT : Ce code utilise la nouvelle version de qiskit (1.0.1)
 
@@ -277,6 +277,7 @@ def oracle_grover_preparation(n_bits, L, Qa, Qfin):
     :param Qfin: QuantumRegister, registre quantique du qubit auxiliaire sur lequel appliquer la porte Z (1 qubit)
     """
     # circuit quantique
+    Qa = Qa[::-1]  # Inverser l'ordre des qubits pour correspondre à l'ordre des bits
     qc = QuantumCircuit(Qa, Qfin)
 
     # On doit supprimer les occurences multiples dans L sinon la porte Z va s'annuler (si le nombre est pair)
@@ -287,9 +288,6 @@ def oracle_grover_preparation(n_bits, L, Qa, Qfin):
         # Création de l'oracle
         # On crée un masque pour marquer l'entier dans la superposition
         mask = format(integer, f"0{n_bits}b")
-        mask = mask[
-            ::-1
-        ]  # On inverse le masque pour l'appliquer dans l'ordre (le bit significatif est en premier)
 
         # On applique des portes NOT (X) sur les qubits qui doivent être à 0 pour qu'il passe à 1
         for i in range(n_bits):
@@ -378,6 +376,7 @@ def minimum_search_circuit(
     show_circuit=False,
     transpile_plot=False,
     show_hist=True,
+    hist_title=None,
     G=True,
     P=True,
     g=None,
@@ -393,6 +392,7 @@ def minimum_search_circuit(
     :param show_circuit: bool, afficher le circuit
     :param transpile_plot: bool, afficher le circuit transpilé (si show_circuit=True)
     :param show_hist: bool, afficher l'histogramme des résultats
+    :param hist_title: str, titre de l'histogramme
     :param G: bool, appliquer l'opérateur de préparation des états superposés (G)
     :param P: bool, appliquer l'opérateur de comparaison des entiers superposés avec l'entier b (P)
     :param g: int, nombre d'itérations de G (si None, on utilise la formule)
@@ -409,7 +409,7 @@ def minimum_search_circuit(
     print(f"L: {L}")
 
     # Nombre de bits nécessaires pour représenter les entiers de L
-    n_bits = qubits_needed(max(L))
+    n_bits = max(qubits_needed(max(L)), 5)
 
     print(f"n_bits = {n_bits}\nN = {len(L)}\n")
 
@@ -432,11 +432,15 @@ def minimum_search_circuit(
     # -- Superposition des n qubits de Qa --
     qc.h(Qa)
 
+    # -- Initialisation de Qfin (qubit auxiliaire) à ket(-)=H.X|0> --
+    qc.x(Qfin)
+    qc.h(Qfin)
+
     # -- Initialisation de Qb (yi) --
     print("--- Initialisation ---")
     if yi is None:
         # Si yi n'est pas donné, on choisit une valeur aléatoire
-        yi = L[0]
+        yi = L[random.randint(0, len(L) - 1)]
         print(f"yi (aléatoire): {yi}\n")
     else:
         print(f"yi (itération précédente): {yi}\n")
@@ -451,15 +455,12 @@ def minimum_search_circuit(
 
     print(f"--- Oracles ---")
 
-    # -- Initialisation de Qfin (qubit auxiliaire) à ket(-)=H.X|0> --
-    qc.x(Qfin)
-    qc.h(Qfin)
-
     # -- Préparation des états superposés pour la recherche de minimum (porte G répété g fois) --
     if G:
         if g is None:
-            # g=pi/4*sqrt(2^n/N) où N est le nombre d'éléments dans L et n est le nombre de qubits
-            g = max(int(round((pi / 4) * (2**n_bits / len(L)) ** 0.5)), 1) + 1
+            # Theoriquement : g=pi/4*sqrt(2^n/N) où N est le nombre d'éléments dans L et n est le nombre de qubits
+            # Empiriquement : g=5 pour N>4 et g=2 pour N<=3
+            g = 5 if len(L) > 4 else 2
         print(f"Itérations de G: {g}")
         for i in range(g):
             # On applique l'oracle pour marquer les états de L dans la superposition
@@ -473,9 +474,9 @@ def minimum_search_circuit(
     # -- Comparaison des états superposés avec l'entier b (porte P répétée p fois) --
     if P:
         if p is None:
-            # p=g-1 où N est le nombre d'éléments dans L
-            p = max(int(round((pi / 4) * (2**n_bits / len(L)) ** 0.5)), 1)
-            # TODO : trouver le bon nombre d'itérations pour P
+            # Theoriquement : p=g-1 où N est le nombre d'éléments dans L
+            # Empiriquement : p=2 pour N<=3 et p=2 pour N>4
+            p = 2
         print(f"Itérations de P: {p}")
         for i in range(p):
             # On applique l'oracle pour comparer les entiers superposés avec l'entier b
@@ -502,9 +503,11 @@ def minimum_search_circuit(
     # -- On regarde le résultat de la mesure pour trouver le minimum --
     print("\n--- Resultats ---")
     # On exécute le circuit
-    qc = transpile(qc, backend)
-    result = backend.run(qc, shots=4096).result()
+    qc_transpile = transpile(qc, backend)
+    result = backend.run(qc_transpile, shots=2048).result()
     counts = result.get_counts()
+    # Inverser les clés, exepmle : {'01': 100} devient {'10': 100}
+    counts = {k[::-1]: v for k, v in counts.items()}
 
     min_L = int(max(counts, key=counts.get), 2)
     print(f"Minimum quantique: {min_L}")
@@ -513,7 +516,14 @@ def minimum_search_circuit(
     # -- Affichage de la distribution des résultats --
     if show_hist:
         # Utiliser plotly pour un affichage interactif
-        # Colorer en rouge les elements de L
+        # Colorer en deepskyblue les elements de L, en darkgray les autres
+        # Colorer en yellow yi
+        colors = [
+            "deepskyblue" if int(k, 2) in L else "darkgray" for k in counts.keys()
+        ]
+        colors = [
+            colors[i] if k != yi else "yellow" for i, k in enumerate(counts.keys())
+        ]
         # Ajouter une annotation pour indiquer le minimum
         # Afficher les probabilités pour chaque entier (au lieu du nombre d'occurences)
         fig = go.Figure(
@@ -521,26 +531,22 @@ def minimum_search_circuit(
                 go.Bar(
                     x=[int(k, 2) for k in counts.keys()],
                     y=[v / sum(counts.values()) for v in counts.values()],
-                    marker=dict(
-                        color=[
-                            "deepskyblue" if int(k, 2) in L else "darkgray"
-                            for k in counts.keys()
-                        ]
-                    ),
+                    marker=dict(color=colors),
                 )
             ]
         )
 
         fig.update_layout(
-            title=f"L = {L}; yi = {bits_to_int(yi)}; "
-            f"min_L = {min_L}; vrai minimum = {min(L)}; "
-            f"n_bits = {n_bits}; N = {len(L)}",
+            title=f"yi = {bits_to_int(yi)}; min_L = {min_L};"
+            f"n_bits = {n_bits}; N = {len(L)}"
+            f"g = {g}; p = {p}; {hist_title}",
             xaxis_title="Entiers",
             yaxis_title="Nombre d'occurences",
             # font
             font=dict(family="Noto Sans", size=25, color="black"),
         )
 
+        # Ajouter une annotation pour indiquer le minimum
         if P:
             fig.add_annotation(
                 x=min_L,
@@ -550,7 +556,18 @@ def minimum_search_circuit(
                 arrowhead=1,
             )
 
-        plot(fig, filename="minimum_search.html")
+        # Ajouter une annotation pour indiquer yi
+        fig.add_annotation(
+            x=bits_to_int(yi),
+            y=counts[format(bits_to_int(yi), f"0{n_bits}b")] / sum(counts.values()),
+            text="yi",
+            showarrow=True,
+            arrowhead=1,
+        )
+
+        plot(
+            fig, filename=f"minimum_search{f'_{hist_title}' if hist_title else ''}.html"
+        )
 
     if return_circuit:
         return qc
@@ -607,25 +624,56 @@ if __name__ == "__main__":
     # Test de toutes les possibilités pour une comparaison de 2 entiers sur 3 bits
     # check_all_possibilities(3)
 
-    # Test de la recherche du minimum dans une liste L
-    L = [2, 1, 3]
+    # Test de la recherche du minimum dans une liste L aléatoire
+    L = [12, 7, 3, 18]
 
-    qc = minimum_search_circuit(
-        L,
-        yi=2,
-        G=True,
-        g=2,
-        P=False,
-        p=3,
-        show_circuit=False,
-        transpile_plot=False,
-        show_hist=True,
-        return_circuit=True,
+    minimum_val = minimum_search_circuit(
+        L, yi=12, G=True, P=True, g=5, p=1, show_hist=True
     )
-
-    qc.draw(output="mpl")
-    plt.show()
 
     # show_oracle_compare_integers(3)
     # show_oracle_grover_preparation(L)
     # show_diffusion_operator(4)
+
+    # Pour des petites listes (N<=3) : g,p = 2, 2
+    # Pour des grandes listes (N>4) : g,p = 5, 2
+
+    # La logique d'itération pour avoir le minimum est la suivante :
+    # On choisi au hasard un entier yi parmi les entiers de L
+    # Puis on relance l'algorithme avec yi = la sortie de l'algorithme précédent
+    # Et on s'arrête quand le minimum n'est plus dans L
+    # On peut aussi s'arrêter après un certain nombre d'itérations (sqrt(N) par exemple)
+
+    """
+    minimum_found = False
+    history = []
+    iteration = 1
+    minimum_val = minimum_search_circuit(
+        L,  # Liste des entiers parmi lesquels chercher le minimum
+        G=True,  # Appliquer l'opérateur de préparation des états superposés
+        P=True,  # Appliquer l'opérateur de comparaison des entiers superposés avec l'entier b
+        show_hist=True,
+        hist_title="Première itération",
+    )
+    while not minimum_found:
+        history.append(minimum_val)
+        print(f"Minimum actuel: {minimum_val}")
+        if minimum_val in L:
+            minimum_val = minimum_search_circuit(
+                L,  # Liste des entiers parmi lesquels chercher le minimum
+                yi=minimum_val,  # Valeur de yi pour la comparaison
+                G=True,  # Appliquer l'opérateur de préparation des états superposés
+                P=True,  # Appliquer l'opérateur de comparaison des entiers superposés avec l'entier b
+                show_hist=True,
+                hist_title=f"Itération {iteration}",
+            )
+        else:
+            if len(history) > 1:
+                minimum_found = True
+                print(f"Minimum trouvé: {history[-2]}")
+            else:
+                print("Minimum non trouvé")
+                minimum_found = True
+
+        iteration += 1
+    """
