@@ -287,13 +287,19 @@ def oracle_grover_preparation(n_bits, L, Qa, Qfin):
         # Création de l'oracle
         # On crée un masque pour marquer l'entier dans la superposition
         mask = format(integer, f"0{n_bits}b")
+        mask = mask[
+            ::-1
+        ]  # On inverse le masque pour l'appliquer dans l'ordre (le bit significatif est en premier)
+
         # On applique des portes NOT (X) sur les qubits qui doivent être à 0 pour qu'il passe à 1
         for i in range(n_bits):
             if mask[i] == "0":
                 qc.x(Qa[i])
 
         # On applique une porte Z sur le qubit auxiliaire si l'entrée est dans L (tout Qa doit être à 1)
-        qc.append(ZGate().control(n_bits), [*Qa, Qfin])
+        qc.h(Qfin)
+        qc.mcx(Qa, Qfin)
+        qc.h(Qfin)
 
         # On applique les portes NOT (X) inverses pour remettre les qubits à leur état initial
         for i in range(n_bits):
@@ -376,6 +382,7 @@ def minimum_search_circuit(
     P=True,
     g=None,
     p=None,
+    return_circuit=False,
 ):
     """
     Circuit pour la recherche du minimum dans une liste d'entiers L
@@ -390,6 +397,7 @@ def minimum_search_circuit(
     :param P: bool, appliquer l'opérateur de comparaison des entiers superposés avec l'entier b (P)
     :param g: int, nombre d'itérations de G (si None, on utilise la formule)
     :param p: int, nombre d'itérations de P (si None, on utilise la formule)
+    :param return_circuit: bool, retourner le circuit
 
     :return: le minimum de L suivant la valeur yi
     """
@@ -422,7 +430,7 @@ def minimum_search_circuit(
     qc = QuantumCircuit(Qa, Qb, Qaux1, Qaux2, Qres, Qfin, Cout)
 
     # -- Superposition des n qubits de Qa --
-    qc.h(Qa[::-1])
+    qc.h(Qa)
 
     # -- Initialisation de Qb (yi) --
     print("--- Initialisation ---")
@@ -433,7 +441,7 @@ def minimum_search_circuit(
     else:
         print(f"yi (itération précédente): {yi}\n")
 
-    assert yi < 2**n_bits, f"yi doit être inférieur à 2**n_bits : {2**n_bits}"
+    assert yi < 2**n_bits, f"yi doit être inférieur ou égale à {2**n_bits-1}"
 
     # On transforme yi en une chaîne de bits (avec n_bits)
     yi = int_to_bits(yi).rjust(n_bits, "0")
@@ -456,11 +464,11 @@ def minimum_search_circuit(
         for i in range(g):
             # On applique l'oracle pour marquer les états de L dans la superposition
             qc.append(
-                oracle_grover_preparation(n_bits, L, Qa[::-1], Qfin).to_instruction(),
-                [*Qa[::-1], *Qfin],
+                oracle_grover_preparation(n_bits, L, Qa, Qfin).to_instruction(),
+                [*Qa, *Qfin],
             )
             # On applique l'opérateur de diffusion pour amplifier les états marqués par l'oracle
-            qc.append(diffusion_operator(Qa[::-1]).to_instruction(), [*Qa[::-1]])
+            qc.append(diffusion_operator(Qa).to_instruction(), [*Qa])
 
     # -- Comparaison des états superposés avec l'entier b (porte P répétée p fois) --
     if P:
@@ -473,12 +481,12 @@ def minimum_search_circuit(
             # On applique l'oracle pour comparer les entiers superposés avec l'entier b
             qc.append(
                 oracle_compare_integers(
-                    Qa[::-1], Qb, Qaux1, Qaux2, Qres, Qfin, n_bits
+                    Qa, Qb, Qaux1, Qaux2, Qres, Qfin, n_bits
                 ).to_instruction(),
-                [*Qa[::-1], *Qb, *Qaux1, *Qaux2, *Qres, *Qfin],
+                [*Qa, *Qb, *Qaux1, *Qaux2, *Qres, *Qfin],
             )
             # On applique l'opérateur de diffusion pour amplifier les états marqués par l'oracle
-            qc.append(diffusion_operator(Qa[::-1]).to_instruction(), [*Qa[::-1]])
+            qc.append(diffusion_operator(Qa).to_instruction(), [*Qa])
 
     # -- Mesure des qubits de Qa --
     qc.measure(Qa, Cout)
@@ -544,6 +552,9 @@ def minimum_search_circuit(
 
         plot(fig, filename="minimum_search.html")
 
+    if return_circuit:
+        return qc
+
     return min_L
 
 
@@ -597,19 +608,23 @@ if __name__ == "__main__":
     # check_all_possibilities(3)
 
     # Test de la recherche du minimum dans une liste L
-    L = [1, 7, 3]
+    L = [2, 1, 3]
 
-    minimum_search_circuit(
+    qc = minimum_search_circuit(
         L,
-        yi=5,
-        G=False,
-        P=True,
-        g=3,
-        p=2,
+        yi=2,
+        G=True,
+        g=2,
+        P=False,
+        p=3,
         show_circuit=False,
         transpile_plot=False,
         show_hist=True,
+        return_circuit=True,
     )
+
+    qc.draw(output="mpl")
+    plt.show()
 
     # show_oracle_compare_integers(3)
     # show_oracle_grover_preparation(L)
