@@ -621,15 +621,10 @@ if __name__ == "__main__":
         provider = IonQProvider(IONQ_API_TOKEN)
         backend = provider.get_backend("ionq_simulator")
 
-    # Test de toutes les possibilités pour une comparaison de 2 entiers sur 3 bits
-    # check_all_possibilities(3)
-
-    # Test de la recherche du minimum dans une liste L aléatoire
+    # Test de la recherche du minimum dans une liste L
     L = [12, 7, 3, 18]
 
-    minimum_val = minimum_search_circuit(
-        L, yi=12, G=True, P=True, g=5, p=1, show_hist=True
-    )
+    # minimum_val = minimum_search_circuit(L, yi=12, G=True, P=True, g=5, p=1, show_hist=True)
 
     # show_oracle_compare_integers(3)
     # show_oracle_grover_preparation(L)
@@ -644,7 +639,6 @@ if __name__ == "__main__":
     # Et on s'arrête quand le minimum n'est plus dans L
     # On peut aussi s'arrêter après un certain nombre d'itérations (sqrt(N) par exemple)
 
-    """
     minimum_found = False
     history = []
     iteration = 1
@@ -672,8 +666,7 @@ if __name__ == "__main__":
                 minimum_found = True
                 print(f"Minimum trouvé: {history[-2]}")
             else:
-                print("Minimum non trouvé")
-                minimum_found = True
+                # On relance l'algorithme avec un nouveau yi
+                yi = L[random.randint(0, len(L) - 1)]
 
         iteration += 1
-    """
