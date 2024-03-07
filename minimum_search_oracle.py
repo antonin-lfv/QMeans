@@ -1,8 +1,8 @@
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, transpile
+from qiskit_ibm_runtime import QiskitRuntimeService
+from qiskit_ionq import IonQProvider
 import matplotlib.pyplot as plt
 from math import log2, ceil
-from qiskit_ionq import IonQProvider
-from qiskit_ibm_runtime import QiskitRuntimeService
 from config import IONQ_API_TOKEN
 import plotly.graph_objects as go
 from plotly.offline import plot
@@ -372,6 +372,7 @@ def show_diffusion_operator(n_bits=2):
 
 def minimum_search_circuit(
     L,
+    backend,
     yi=None,
     show_circuit=False,
     transpile_plot=False,
@@ -382,6 +383,7 @@ def minimum_search_circuit(
     g=None,
     p=None,
     return_circuit=False,
+    show_logs=False,
 ):
     """
     Circuit pour la recherche du minimum dans une liste d'entiers L
@@ -398,6 +400,7 @@ def minimum_search_circuit(
     :param g: int, nombre d'itérations de G (si None, on utilise la formule)
     :param p: int, nombre d'itérations de P (si None, on utilise la formule)
     :param return_circuit: bool, retourner le circuit
+    :param show_logs: bool, afficher les logs
 
     :return: le minimum de L suivant la valeur yi
     """
@@ -405,13 +408,13 @@ def minimum_search_circuit(
     assert all(isinstance(x, int) for x in L), "La liste doit contenir des entiers"
     assert isinstance(yi, int) or yi is None, "yi doit être un entier ou None"
 
-    print("--- Données ---")
-    print(f"L: {L}")
-
     # Nombre de bits nécessaires pour représenter les entiers de L
     n_bits = max(qubits_needed(max(L)), 5)
 
-    print(f"n_bits = {n_bits}\nN = {len(L)}\n")
+    if show_logs:
+        print("--- Données ---")
+        print(f"L: {L}")
+        print(f"n_bits = {n_bits}\nN = {len(L)}\n")
 
     # Registre quantique pour les entiers à comparer
     Qa = QuantumRegister(n_bits, "a")
@@ -437,13 +440,16 @@ def minimum_search_circuit(
     qc.h(Qfin)
 
     # -- Initialisation de Qb (yi) --
-    print("--- Initialisation ---")
+    if show_logs:
+        print("--- Initialisation ---")
     if yi is None:
         # Si yi n'est pas donné, on choisit une valeur aléatoire
         yi = L[random.randint(0, len(L) - 1)]
-        print(f"yi (aléatoire): {yi}\n")
+        if show_logs:
+            print(f"yi (aléatoire): {yi}\n")
     else:
-        print(f"yi (itération précédente): {yi}\n")
+        if show_logs:
+            print(f"yi (itération précédente): {yi}\n")
 
     assert yi < 2**n_bits, f"yi doit être inférieur ou égale à {2**n_bits-1}"
 
@@ -453,7 +459,8 @@ def minimum_search_circuit(
     for i in range(n_bits):
         qc.append(encode(yi[i]).to_instruction(), [Qb[i]])
 
-    print(f"--- Oracles ---")
+    if show_logs:
+        print(f"--- Oracles ---")
 
     # -- Préparation des états superposés pour la recherche de minimum (porte G répété g fois) --
     if G:
@@ -461,7 +468,8 @@ def minimum_search_circuit(
             # Theoriquement : g=pi/4*sqrt(2^n/N) où N est le nombre d'éléments dans L et n est le nombre de qubits
             # Empiriquement : g=5 pour N>4 et g=2 pour N<=3
             g = 5 if len(L) > 4 else 2
-        print(f"Itérations de G: {g}")
+        if show_logs:
+            print(f"Itérations de G: {g}")
         for i in range(g):
             # On applique l'oracle pour marquer les états de L dans la superposition
             qc.append(
@@ -474,10 +482,11 @@ def minimum_search_circuit(
     # -- Comparaison des états superposés avec l'entier b (porte P répétée p fois) --
     if P:
         if p is None:
-            # Theoriquement : p=g-1 où N est le nombre d'éléments dans L
+            # Theoriquement :
             # Empiriquement : p=2 pour N<=3 et p=2 pour N>4
             p = 2
-        print(f"Itérations de P: {p}")
+        if show_logs:
+            print(f"Itérations de P: {p}")
         for i in range(p):
             # On applique l'oracle pour comparer les entiers superposés avec l'entier b
             qc.append(
@@ -501,7 +510,8 @@ def minimum_search_circuit(
         plt.show()
 
     # -- On regarde le résultat de la mesure pour trouver le minimum --
-    print("\n--- Resultats ---")
+    if show_logs:
+        print("\n--- Resultats ---")
     # On exécute le circuit
     qc_transpile = transpile(qc, backend)
     result = backend.run(qc_transpile, shots=2048).result()
@@ -510,8 +520,9 @@ def minimum_search_circuit(
     counts = {k[::-1]: v for k, v in counts.items()}
 
     min_L = int(max(counts, key=counts.get), 2)
-    print(f"Minimum quantique: {min_L}")
-    print(f"Vrai minimum: {min(L)}")
+    if show_logs:
+        print(f"Minimum quantique: {min_L}")
+        print(f"Vrai minimum: {min(L)}")
 
     # -- Affichage de la distribution des résultats --
     if show_hist:
@@ -575,6 +586,113 @@ def minimum_search_circuit(
     return min_L
 
 
+def minimum_search(L, backend, g=None, p=None, show_logs=False, plot_fig=False):
+    """
+    Recherche du minimum dans une liste L
+    Utilise l'algorithme de recherche du minimum quantique
+
+    On choisi au hasard un entier yi parmi les entiers de L
+    Puis on relance l'algorithme avec yi = la sortie de l'algorithme précédent
+    Et on s'arrête quand le minimum n'est plus dans L
+    On peut aussi s'arrêter après un certain nombre d'itérations sqrt(N)
+
+    Parametres:
+    :param L: list, liste des entiers parmi lesquels chercher le minimum
+    :param backend: backend, backend pour exécuter le circuit
+    :param g: int, nombre d'itérations de G
+    :param p: int, nombre d'itérations de P
+    :param show_logs: bool, afficher les logs
+    :param plot_fig: bool, afficher l'évolution de la recherche (la valeur de yi à chaque itération)
+
+    :return: le minimum de L
+    """
+    minimum_found = False
+    history = []
+    iteration = 1
+    minimum_value = None
+    minimum_val = minimum_search_circuit(
+        L,  # Liste des entiers parmi lesquels chercher le minimum
+        backend,
+        G=True,  # Appliquer l'opérateur de préparation des états superposés
+        P=True,  # Appliquer l'opérateur de comparaison des entiers superposés avec l'entier b
+        show_hist=True,
+        hist_title="Première itération",
+        show_logs=show_logs,
+        g=g,
+        p=p,
+    )
+    while not minimum_found:
+        history.append(minimum_val)
+        if iteration <= len(L) ** 0.5:
+            if minimum_val in L:
+                minimum_val = minimum_search_circuit(
+                    L,  # Liste des entiers parmi lesquels chercher le minimum
+                    backend,
+                    yi=minimum_val,  # Valeur de yi pour la comparaison
+                    G=True,  # Appliquer l'opérateur de préparation des états superposés
+                    P=True,  # Appliquer l'opérateur de comparaison des entiers superposés avec l'entier b
+                    show_hist=True,
+                    hist_title=f"Itération {iteration}",
+                    show_logs=show_logs,
+                    g=g,
+                    p=p,
+                )
+                # print(f"Minimum à l'itération {iteration}: {minimum_val}")
+            else:
+                if len(history) > 1:
+                    minimum_found = True
+                    # print(f"Minimum trouvé: {history[-2]} car {history[-1]} n'est pas dans L")
+                    minimum_value = history[-2]
+                else:
+                    # On relance l'algorithme avec un nouveau yi
+                    history = []
+                    minimum_val = minimum_search_circuit(
+                        L,  # Liste des entiers parmi lesquels chercher le minimum
+                        backend,
+                        G=True,  # Appliquer l'opérateur de préparation des états superposés
+                        P=True,  # Appliquer l'opérateur de comparaison des entiers superposés avec l'entier b
+                        show_hist=True,
+                        hist_title="Première itération",
+                        show_logs=show_logs,
+                        g=g,
+                        p=p,
+                    )
+                    iteration = 0
+                    # print(f"Relance de l'algorithme avec un nouveau yi: {minimum_val}")
+
+            iteration += 1
+
+        else:
+            minimum_found = True
+            # print(f"Nombre d'itérations maximum atteint: {iteration-1}")
+            # le minimum est donc la dernière valeur de history
+            # print(f"Minimum trouvé: {history[-1]}")
+            minimum_value = history[-1]
+
+    if plot_fig:
+        # On affiche l'évolution de la recherche (la valeur de yi à chaque itération)
+        # pour voir sa vitesse de convergence
+        fig = go.Figure(
+            data=[
+                go.Scatter(
+                    x=[i for i in range(len(history))], y=history, mode="lines+markers"
+                )
+            ]
+        )
+        fig.update_layout(
+            title=f"Evolution de la recherche du minimum",
+            xaxis_title="Itération",
+            yaxis_title="Valeur de yi",
+            # font
+            font=dict(family="Noto Sans", size=25, color="black"),
+        )
+        plot(fig, filename=f"minimum_search_history.html")
+
+        assert minimum_value is not None, "Le minimum n'a pas été trouvé"
+
+    return minimum_value
+
+
 # TESTS
 
 
@@ -614,17 +732,18 @@ if __name__ == "__main__":
         print("Using IBM platform...\n")
         # Load saved credentials
         service = QiskitRuntimeService()
-        backend = service.backend("simulator_mps")
-    elif platform == "IONQ":
+        backend = service.backend("ibm_brisbane")
+        # simulator_mps, ibmq_qasm_simulator, simulator_statevector
+    else:
         print("Using IONQ platform...\n")
 
         provider = IonQProvider(IONQ_API_TOKEN)
         backend = provider.get_backend("ionq_simulator")
 
     # Test de la recherche du minimum dans une liste L
-    L = [12, 7, 3, 18]
+    L = [8, 12, 29, 16, 10, 3]
 
-    # minimum_val = minimum_search_circuit(L, yi=12, G=True, P=True, g=5, p=1, show_hist=True)
+    # minimum_val = minimum_search_circuit(L, backend, yi=12, g=3, p=1, show_hist=True)
 
     # show_oracle_compare_integers(3)
     # show_oracle_grover_preparation(L)
@@ -633,40 +752,4 @@ if __name__ == "__main__":
     # Pour des petites listes (N<=3) : g,p = 2, 2
     # Pour des grandes listes (N>4) : g,p = 5, 2
 
-    # La logique d'itération pour avoir le minimum est la suivante :
-    # On choisi au hasard un entier yi parmi les entiers de L
-    # Puis on relance l'algorithme avec yi = la sortie de l'algorithme précédent
-    # Et on s'arrête quand le minimum n'est plus dans L
-    # On peut aussi s'arrêter après un certain nombre d'itérations (sqrt(N) par exemple)
-
-    minimum_found = False
-    history = []
-    iteration = 1
-    minimum_val = minimum_search_circuit(
-        L,  # Liste des entiers parmi lesquels chercher le minimum
-        G=True,  # Appliquer l'opérateur de préparation des états superposés
-        P=True,  # Appliquer l'opérateur de comparaison des entiers superposés avec l'entier b
-        show_hist=True,
-        hist_title="Première itération",
-    )
-    while not minimum_found:
-        history.append(minimum_val)
-        print(f"Minimum actuel: {minimum_val}")
-        if minimum_val in L:
-            minimum_val = minimum_search_circuit(
-                L,  # Liste des entiers parmi lesquels chercher le minimum
-                yi=minimum_val,  # Valeur de yi pour la comparaison
-                G=True,  # Appliquer l'opérateur de préparation des états superposés
-                P=True,  # Appliquer l'opérateur de comparaison des entiers superposés avec l'entier b
-                show_hist=True,
-                hist_title=f"Itération {iteration}",
-            )
-        else:
-            if len(history) > 1:
-                minimum_found = True
-                print(f"Minimum trouvé: {history[-2]}")
-            else:
-                # On relance l'algorithme avec un nouveau yi
-                yi = L[random.randint(0, len(L) - 1)]
-
-        iteration += 1
+    minimum_search(L, backend, g=5, p=2, plot_fig=True, show_logs=True)

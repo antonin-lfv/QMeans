@@ -4,7 +4,6 @@ from plotly.offline import plot
 from classical_utils import get_cluster_labels, compute_accuracy
 from quantum_utils_CLOUD import (
     distance_centroids_parallel,
-    transform_distances_matrix_to_bit_matrix,
     apply_quantum_find_min,
 )
 from tqdm import tqdm
@@ -13,7 +12,12 @@ import random
 
 class QMeans:
     def __init__(
-        self, n_clusters, max_iter=10, random_state=None, init_method="kmeans++"
+        self,
+        n_clusters,
+        backend,
+        max_iter=10,
+        random_state=None,
+        init_method="kmeans++",
     ):
         self.n_clusters = n_clusters
         self.max_iter = max_iter
@@ -22,6 +26,7 @@ class QMeans:
         self.labels_ = None
         self.accuracy_train = []
         self.init_method = init_method
+        self.backend = backend
 
     def initialize_centroids_maximin(self, X):
         """
@@ -71,7 +76,7 @@ class QMeans:
 
         self.centroids_ = centroids
 
-    def initialize_centroids_q_plusplus(self, points, backend, shots=4096):
+    def initialize_centroids_q_plusplus(self, points, shots=4096):
         """
         QMeans++ initialization method.
         Using the quantum algorithm to find the minimum distance between a point and a set of points.
@@ -92,7 +97,9 @@ class QMeans:
                 list(
                     map(
                         lambda x: min(
-                            distance_centroids_parallel(x, centroids, backend, shots)
+                            distance_centroids_parallel(
+                                x, centroids, self.backend, shots
+                            )
                         ),
                         points,
                     )
@@ -112,11 +119,11 @@ class QMeans:
         self.centroids_ = centroids
         print("End QMeans++ initialization method")
 
-    def fit(self, X_train, X_test, y_test, backend=None, shots=4096):
+    def fit(self, X_train, X_test, y_test, shots=4096):
         if self.init_method == "kmeans++":
             self.initialize_centroids_k_plusplus(X_train)
         elif self.init_method == "qmeans++":
-            self.initialize_centroids_q_plusplus(X_train, backend, shots)
+            self.initialize_centroids_q_plusplus(X_train, shots)
         elif self.init_method == "maximin":
             self.initialize_centroids_maximin(X_train)
         else:
@@ -131,18 +138,20 @@ class QMeans:
                 list(
                     map(
                         lambda x: distance_centroids_parallel(
-                            x, self.centroids_, backend, shots
+                            x, self.centroids_, self.backend, shots
                         ),
                         X_train,
                     )
                 )
             )
 
-            # Quantize the distances matrix
-            bit_matrix = transform_distances_matrix_to_bit_matrix(distances)
+            print("distances", distances)
 
             # We compute the quantum minimum for each point to have the labels
-            labels = np.apply_along_axis(apply_quantum_find_min, axis=1, arr=bit_matrix)
+            labels = np.apply_along_axis(
+                apply_quantum_find_min, axis=1, arr=distances, backend=self.backend
+            )
+            print("labels", labels)
 
             new_centroids = np.array(
                 [X_train[labels == i].mean(axis=0) for i in range(self.n_clusters)]
@@ -155,7 +164,7 @@ class QMeans:
             self.centroids_ = new_centroids
 
             # Calcul de l'accuracy
-            y_pred_test = self.predict(X_test, backend, shots)
+            y_pred_test = self.predict(X_test, self.backend, shots)
             y_mapped_test = get_cluster_labels(y_pred_test, y_test)
             self.accuracy_train.append(compute_accuracy(y_mapped_test, y_test))
 
@@ -177,7 +186,7 @@ class QMeans:
         self.labels_ = labels
         return self
 
-    def predict(self, X, backend=None, shots=1024):
+    def predict(self, X, backend, shots=1024):
         distances = np.array(
             list(
                 map(
@@ -189,8 +198,9 @@ class QMeans:
             )
         )
 
-        bit_matrix = transform_distances_matrix_to_bit_matrix(distances)
-        return np.apply_along_axis(apply_quantum_find_min, axis=1, arr=bit_matrix)
+        return np.apply_along_axis(
+            apply_quantum_find_min, axis=1, arr=distances, backend=backend
+        )
 
     def plot_data_with_labels(self, X_train, return_fig=False):
         """

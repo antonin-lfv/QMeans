@@ -1,12 +1,6 @@
 from scipy.stats import mode
 import numpy as np
-from qiskit import QuantumRegister, ClassicalRegister
-from qiskit import QuantumCircuit
-from qiskit import execute
-from numpy import pi
 from fastdist import fastdist
-from qiskit_ibm_provider import IBMProvider
-from tqdm import tqdm
 
 
 def get_cluster_labels(y_pred, y_true):

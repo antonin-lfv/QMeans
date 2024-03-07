@@ -1,11 +1,6 @@
-from qiskit import (
-    QuantumCircuit,
-    execute,
-    QuantumRegister,
-    ClassicalRegister,
-)
-from qiskit_ibm_provider import IBMProvider
-from qiskit.tools.visualization import circuit_drawer, plot_histogram
+from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, transpile
+from qiskit_ibm_runtime import QiskitRuntimeService
+from minimum_search_oracle import minimum_search
 
 import plotly.graph_objects as go
 from plotly.offline import plot
@@ -24,34 +19,18 @@ from classical_utils import euclidean_distance
 # ======================================================================================================================
 
 
-def rank_and_convert(row):
+def apply_quantum_find_min(row, backend):
     """
-    Trouve les valeurs uniques, les trie, et retourne les indices de chaque élément.
-    Convertit ensuite ces indices en bitstrings.
+    Applique la fonction quantum_find_min à une ligne de la matrice de distances.
     """
-    unique_values, inverse_indices = np.unique(row, return_inverse=True)
-    bit_row = np.vectorize(int_to_bits)(inverse_indices + 1, 3)
-    return bit_row
-
-
-def transform_distances_matrix_to_bit_matrix(matrix):
-    """
-    Transforme une matrice de distances en une matrice de bits.
-    Pour cela, on commence par trier les valeurs uniques de la matrice, puis on convertit chaque valeur en bits.
-    On obtient ainsi une matrice de bits.
-    """
-    bit_matrix = np.apply_along_axis(rank_and_convert, axis=1, arr=matrix)
-    return bit_matrix
-
-
-def apply_quantum_find_min(row):
-    """
-    Applique la fonction quantum_find_min à une ligne de la matrice de bits.
-    """
-    # Convertir la ligne en liste de chaînes de bits
-    list_of_bits = row.tolist()
+    row = row.tolist()
+    print(f"Liste: {row}")
+    print(f"types: {type(row[0])}")
+    # On re scale les valeurs pour qu'elles soient entre 0 et 63 (à cause de la limite matérielle des simulateurs)
+    row = [int(63 * (x - min(row)) / (max(row) - min(row))) for x in row]
     # Appeler quantum_find_min et retourner seulement l'index
-    index = quantum_find_min(list_of_bits, only_index=True, shots=100)
+    index = minimum_search(row, backend)
+    print(f"List of bits: {row}, index of the min: {index}")
     return index
 
 
@@ -128,16 +107,13 @@ def int_to_bits(integer):
     return format(integer, "b")
 
 
-def compare_bitstring(
-    bitstring_a, bitstring_b, plot_circuit=False, return_time=False, shots=1024
-):
+def compare_bitstring(bitstring_a, bitstring_b, return_time=False, shots=1024):
     """
     Compare two bitstrings using quantum computing.
 
     Parameters:
         bitstring_a: first bitstring to compare, e.g. "101"
         bitstring_b: second bitstring to compare, e.g. "010"
-        plot_circuit: if True, plot the circuit
         return_time: if True, return the circuit time
         shots: number of shots to perform
 
@@ -191,18 +167,12 @@ def compare_bitstring(
     qc.measure(qraux[1], cr[1])
 
     # Do the simulation, returning the result
-    result = execute(qc, backend, shots=shots).result()
+    qc_transpile = transpile(qc, backend)
+    result = backend.run(qc_transpile, shots=shots).result()
     circuit_time = result.results[0]._metadata["metadata"]["sample_measure_time"]
 
     # get the probability distribution
     counts = result.get_counts()
-
-    if plot_circuit:
-        circuit_drawer(
-            qc,
-            output="mpl",
-        )
-        plt.show()
 
     if return_time:
         return counts, circuit_time
@@ -297,35 +267,6 @@ def compare_bitstring_compare_time():
 # compare_bitstring_compare_time()
 
 
-def quantum_find_min(list_of_bits, shots=100, only_index=False) -> (int, int):
-    """
-    Find the minimum bitstring in a list of bitstrings and return its index
-    :param list_of_bits: list of bitstrings to compare e.g. ["0101", "0100", "0110", "0010", "1001"]
-    :param shots: number of shots to perform
-    :param only_index: if True, return only the index of the minimum bitstring
-    :return: value of the min and index of it in list_of_bits or only the index
-    """
-    min_index = 0
-    min_value = bits_to_int(list_of_bits[0])
-    for i in range(1, len(list_of_bits)):
-        # print(f"Comparing {list_of_bits[min_index]} and {list_of_bits[i]}")
-        counts = compare_bitstring(
-            list_of_bits[min_index], list_of_bits[i], shots=shots
-        )
-        if "01" not in counts:
-            counts["01"] = 0
-        if "10" not in counts:
-            counts["10"] = 0
-        if counts["01"] > counts["10"]:
-            min_index = i
-            min_value = bits_to_int(list_of_bits[i])
-
-    if only_index:
-        return min_index
-
-    return min_value, min_index
-
-
 def quantum_find_max(list_of_bits, shots=1024, only_index=False) -> (int, int):
     """
     Find the maximum bitstring in a list of bitstrings and return its index
@@ -355,17 +296,6 @@ def quantum_find_max(list_of_bits, shots=1024, only_index=False) -> (int, int):
     return max_value, max_index
 
 
-# Test quantum_find_min
-def test_quantum_find_min():
-    bitstrings = ["1101", "0010", "1110", "0110", "0101", "1111", "1011"]
-    min_value, min_index = quantum_find_min(bitstrings, shots=100)
-    print(f"Bitstring : {[bits_to_int(bitstring) for bitstring in bitstrings]}")
-    print(
-        f"The minimum bitstring is: {bitstrings[min_index]}, with value {min_value} and index {min_index}"
-    )
-    return min_value, min_index
-
-
 # test_quantum_find_max
 def test_quantum_find_max():
     bitstrings = ["1101", "0010", "1110", "0110", "0101", "1111", "1011"]
@@ -375,47 +305,6 @@ def test_quantum_find_max():
         f"The maximum bitstring is: {bitstrings[max_index]}, with value {max_value} and index {max_index}"
     )
     return max_value, max_index
-
-
-def get_success_rate_min(nb_bits=3, list_size=3, nb_tests=50, shots=5):
-    """
-    Get the success rate of quantum_find_min with random bitstrings
-    :param nb_bits: number of bits to represent each integer
-    :param list_size: number of integers in the list
-    :param nb_tests: number of tests to perform
-    :param shots: number of shots to perform
-    """
-    random.seed(0)
-    nb_success = 0
-    for _ in tqdm(range(nb_tests)):
-        list_of_ints = [random.randint(0, 2**nb_bits - 1) for _ in range(list_size)]
-        list_of_bits = [int_to_bits(integer) for integer in list_of_ints]
-        min_value, min_index = quantum_find_min(list_of_bits, shots=shots)
-        if min_value == min(list_of_ints):
-            nb_success += 1
-
-    print(f"Success rate find min: {nb_success / nb_tests}")
-    return nb_success / nb_tests
-
-
-# get_success_rate_min(4, 5, 50, 5)
-
-
-# Success rate with find_min
-# Pourcentage de réussite avec une liste de 5 elements sur 2 bits : 0.72 (50 tests)
-# Pourcentage de réussite avec une liste de 3 elements sur 2 bits : 0.74 (50 tests)
-# Pourcentage de réussite avec une liste de 5 elements sur 3 bits : 0.82 (50 tests)
-# Pourcentage de réussite avec une liste de 3 elements sur 3 bits : 0.96 (50 tests)
-# Pourcentage de réussite avec une liste de 5 elements sur 4 bits : 0.52 (50 tests)
-# Pourcentage de réussite avec une liste de 3 elements sur 4 bits : 0.70 (50 tests)
-# Pourcentage de réussite avec une liste de 5 elements sur 5 bits : 0.46 (50 tests)
-# Pourcentage de réussite avec une liste de 3 elements sur 5 bits : 0.62 (50 tests)
-# Pourcentage de réussite avec une liste de 5 elements sur 6 bits : 0.48 (50 tests)
-# Pourcentage de réussite avec une liste de 3 elements sur 6 bits : 0.68 (50 tests)
-# Pourcentage de réussite avec une liste de 5 elements sur 7 bits : 0.44 (50 tests)
-# Pourcentage de réussite avec une liste de 3 elements sur 7 bits : 0.62 (50 tests)
-# Pourcentage de réussite avec une liste de 5 elements sur 8 bits : 0.38 (50 tests)
-# Pourcentage de réussite avec une liste de 3 elements sur 8 bits : 0.52 (50 tests)
 
 
 def plot_success_rate_min():
@@ -539,7 +428,7 @@ def distance_centroids_parallel(
     Parameters:
         point: point to measure distance from, e.g. [0.1, 0.2]
         centroids: list of centroids, e.g. [[0.1, 0.2], [0.3, 0.4], [0.5, 0.6]] (3 centroids so list of length 3)
-        backend (IBMProvider backend): backend to use
+        backend: backend to use
         shots (int): number of shots to use
         return_time (bool): if True, return the circuit time
 
@@ -594,8 +483,8 @@ def distance_centroids_parallel(
         # Measure ancillary
         qc.measure(qreg_psi[i], creg[i])
 
-    # Register and execute job
-    job = execute(qc, backend=backend, shots=shots)
+    qc = transpile(qc, backend)
+    job = backend.run(qc, shots=shots)
     job_result = job.result()
     result = job_result.get_counts(qc)
 
@@ -644,8 +533,8 @@ def distances_for_multiple_examples_tests(
         centroids = [np.random.rand(2).tolist() for _ in range(num_centroids)]
 
         # Utilisation du simulateur comme backend
-        provider = IBMProvider()
-        backend = provider.get_backend("ibmq_qasm_simulator")
+        service = QiskitRuntimeService()
+        backend = service.backend("simulator_mps")
 
         # Calculer les distances quantiques
         quantum_distances = distance_centroids_parallel(
@@ -702,12 +591,12 @@ def quantum_vs_classical_time_distances_compute():
     print(f"- Classical time: {classical_time} seconds")
 
     # quantum
-    backend_name = "ibm_brisbane"
-    backend = provider.get_backend(backend_name)
+    service = QiskitRuntimeService()
+    backend = service.backend("simulator_mps")
     _, quantum_time = distance_centroids_parallel(
         data_point, centroids, backend, shots=512, return_time=True
     )
-    print(f"- Quantum time: {quantum_time} seconds, backend: {backend_name}")
+    print(f"- Quantum time: {quantum_time} seconds, backend: simulator_mps")
 
 
 # quantum_vs_classical_time_distances_compute()
@@ -715,7 +604,5 @@ def quantum_vs_classical_time_distances_compute():
 
 if __name__ == "__main__":
     # IBMQ account
-    provider = IBMProvider()
-    backend = provider.get_backend(
-        "simulator_mps"
-    )  # simulator_mps, ibmq_qasm_simulator
+    service = QiskitRuntimeService()
+    backend = service.backend("simulator_mps")  # simulator_mps, ibmq_qasm_simulator

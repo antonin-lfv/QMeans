@@ -2,8 +2,9 @@ from dataset import Kmeans_dataset
 from KMeans_code.delta_KMeans import DeltaKMeans
 from KMeans_code.KMeans_file import ClassicKMeans
 from QMeans_code.my_qmeans import QMeans
-
-from qiskit_ibm_provider import IBMProvider
+from config import IBM_QUANTUM_API_TOKEN, IONQ_API_TOKEN
+from qiskit_ibm_runtime import QiskitRuntimeService
+from qiskit_ionq import IonQProvider
 
 from plotly.subplots import make_subplots
 from plotly.offline import plot
@@ -11,6 +12,7 @@ from plotly.offline import plot
 import warnings
 
 warnings.filterwarnings("ignore", category=RuntimeWarning)
+# QiskitRuntimeService.save_account(channel="ibm_cloud", token=IBM_QUANTUM_API_TOKEN, instance='ibm-q/open/main')
 
 
 if __name__ == "__main__":
@@ -19,17 +21,27 @@ if __name__ == "__main__":
     # ======================== Data ======================== #
 
     source = "varied"
-    n_clusters = 3
+    n_clusters = 4
     n_features = 2
-    n_samples = 150
+    n_samples = 80
     random_state = 999
     cluster_std = 0.045
     test_size = 0.15
 
     delta_init = 0.0005
 
-    backend = IBMProvider().get_backend("ibmq_qasm_simulator")
-    shots = 4096
+    service = "IBM"
+    if service == "IBM":
+        print("Using IBM Quantum Service")
+        service = QiskitRuntimeService()
+        backend = service.backend("simulator_mps")
+
+    else:
+        print("Using IonQ Quantum Service")
+        provider = IonQProvider(IONQ_API_TOKEN)
+        backend = provider.get_backend("ionq_simulator")
+
+    shots = 2048
 
     data = Kmeans_dataset(
         source=source,
@@ -57,7 +69,10 @@ if __name__ == "__main__":
 
     # QMeans
     qmeans = QMeans(
-        n_clusters=n_clusters, random_state=random_state, init_method="qmeans++"
+        n_clusters=n_clusters,
+        random_state=random_state,
+        init_method="kmeans++",
+        backend=backend,
     )
 
     # ======================== Training ======================== #
@@ -68,7 +83,7 @@ if __name__ == "__main__":
     delta_kmeans.fit(X_train, X_test, y_test)
 
     print("Start training QMeans...")
-    qmeans.fit(X_train, X_test, y_test, backend=backend, shots=shots)
+    qmeans.fit(X_train, X_test, y_test, shots=shots)
 
     print("Training done.")
 
