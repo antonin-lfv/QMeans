@@ -3,3 +3,4 @@ __pycache__
 config.py
 /images
 /article_images/
+.python-version

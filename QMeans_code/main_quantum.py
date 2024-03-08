@@ -1,6 +1,6 @@
 from QMeans_code.my_qmeans import QMeans
-from qiskit_ibm_provider import IBMProvider
 from qiskit_ionq import IonQProvider
+from qiskit_ibm_runtime import QiskitRuntimeService
 
 from config import IBM_QUANTUM_API_TOKEN, IONQ_API_TOKEN
 from dataset import Kmeans_dataset
@@ -8,20 +8,11 @@ from dataset import Kmeans_dataset
 if __name__ == "__main__":
     provider = "IBM"
     if provider == "IBM":
-        # Save IBMQ account
-        # IBMProvider.save_account(IBM_QUANTUM_API_TOKEN)
         # Load IBMQ account
-        provider = IBMProvider()
-        # Print available backends
-        # print(provider.backends())
-        # Choose backend
-        backend = provider.get_backend("ibmq_qasm_simulator")
+        service = QiskitRuntimeService()
+        backend = service.backend("simulator_mps")
     else:
-        # Save IonQ account
         provider = IonQProvider(IONQ_API_TOKEN)
-        # print available backends
-        print(provider.backends())
-        # Choose backend
         backend = provider.get_backend("ionq_simulator")
 
     # Parameters
@@ -49,7 +40,9 @@ if __name__ == "__main__":
 
     # model
     print("Start training...")
-    model = QMeans(n_clusters=n_clusters, max_iter=10, random_state=random_state)
-    model.fit(X_train, X_test, y_test, backend=backend, shots=4096)
+    model = QMeans(
+        n_clusters=n_clusters, max_iter=10, random_state=random_state, backend=backend
+    )
+    model.fit(X_train, X_test, y_test, shots=4096)
     model.plot_data_with_labels(X_train)
     model.plot_accuracy()

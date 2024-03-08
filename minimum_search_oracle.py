@@ -2,11 +2,11 @@ from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, transpile
 from qiskit_ibm_runtime import QiskitRuntimeService
 from qiskit_ionq import IonQProvider
 import matplotlib.pyplot as plt
-from math import log2, ceil
-from config import IONQ_API_TOKEN
+from math import log2, ceil, sqrt
 import plotly.graph_objects as go
 from plotly.offline import plot
 import random
+from config import IBM_QUANTUM_API_TOKEN, IONQ_API_TOKEN
 
 # IMPORTANT : Ce code utilise la nouvelle version de qiskit (1.0.1)
 
@@ -467,7 +467,8 @@ def minimum_search_circuit(
         if g is None:
             # Theoriquement : g=pi/4*sqrt(2^n/N) où N est le nombre d'éléments dans L et n est le nombre de qubits
             # Empiriquement : g=5 pour N>4 et g=2 pour N<=3
-            g = 5 if len(L) > 4 else 2
+            g = int(round(sqrt(2**n_bits / len(L))))
+
         if show_logs:
             print(f"Itérations de G: {g}")
         for i in range(g):
@@ -482,9 +483,10 @@ def minimum_search_circuit(
     # -- Comparaison des états superposés avec l'entier b (porte P répétée p fois) --
     if P:
         if p is None:
-            # Theoriquement :
+            # Theoriquement : comme g
             # Empiriquement : p=2 pour N<=3 et p=2 pour N>4
-            p = 2
+            p = int(round(sqrt(2**n_bits / len(L))))
+
         if show_logs:
             print(f"Itérations de P: {p}")
         for i in range(p):
@@ -727,13 +729,15 @@ def check_all_possibilities(number_of_bits):
 
 
 if __name__ == "__main__":
-    platform = "IBM"
+    platform = "IONQ"
     if platform == "IBM":
         print("Using IBM platform...\n")
-        # Load saved credentials
-        service = QiskitRuntimeService()
-        backend = service.backend("ibm_brisbane")
-        # simulator_mps, ibmq_qasm_simulator, simulator_statevector
+        service = QiskitRuntimeService(name="personnal")
+
+        # print(f"Ordinateurs disponibles: {service.backends()}")
+        backend = service.get_backend("ibm_kyoto")
+        # simulateurs : simulator_mps, ibmq_qasm_simulator, simulator_statevector
+        # vrai système : ibm_brisbane
     else:
         print("Using IONQ platform...\n")
 
@@ -741,7 +745,8 @@ if __name__ == "__main__":
         backend = provider.get_backend("ionq_simulator")
 
     # Test de la recherche du minimum dans une liste L
-    L = [8, 12, 29, 16, 10, 3]
+    # L = [18927, 189, 2801901, 29, 18019, 9182, 1829382]  # seulement sur des vrais ordinateurs quantiques
+    L = [29, 2, 31, 19, 11, 29, 12, 7]
 
     # minimum_val = minimum_search_circuit(L, backend, yi=12, g=3, p=1, show_hist=True)
 
@@ -749,7 +754,4 @@ if __name__ == "__main__":
     # show_oracle_grover_preparation(L)
     # show_diffusion_operator(4)
 
-    # Pour des petites listes (N<=3) : g,p = 2, 2
-    # Pour des grandes listes (N>4) : g,p = 5, 2
-
-    minimum_search(L, backend, g=5, p=2, plot_fig=True, show_logs=True)
+    minimum_search(L, backend, g=5, p=1, plot_fig=False, show_logs=True)
