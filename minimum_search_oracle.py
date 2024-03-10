@@ -2,7 +2,7 @@ from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, transpile
 from qiskit_ibm_runtime import QiskitRuntimeService
 from qiskit_ionq import IonQProvider
 import matplotlib.pyplot as plt
-from math import log2, ceil, sqrt
+from math import log2, ceil, sqrt, pi
 import plotly.graph_objects as go
 from plotly.offline import plot
 import random
@@ -390,6 +390,7 @@ def minimum_search_circuit(
 
     Parametres:
     :param L: list, liste des entiers parmi lesquels chercher le minimum
+    :param backend: backend, backend pour exécuter le circuit
     :param yi: int, valeur de yi pour la comparaison (si None, on utilise une valeur aléatoire)
     :param show_circuit: bool, afficher le circuit
     :param transpile_plot: bool, afficher le circuit transpilé (si show_circuit=True)
@@ -467,7 +468,7 @@ def minimum_search_circuit(
         if g is None:
             # Theoriquement : g=pi/4*sqrt(2^n/N) où N est le nombre d'éléments dans L et n est le nombre de qubits
             # Empiriquement : g=5 pour N>4 et g=2 pour N<=3
-            g = int(round(sqrt(2**n_bits / len(L))))
+            g = int(round((pi / 4) * sqrt(2**n_bits / len(L)) - 0.5))
 
         if show_logs:
             print(f"Itérations de G: {g}")
@@ -479,13 +480,18 @@ def minimum_search_circuit(
             )
             # On applique l'opérateur de diffusion pour amplifier les états marqués par l'oracle
             qc.append(diffusion_operator(Qa).to_instruction(), [*Qa])
+            # On decalre le qubit auxiliaire pour l'operateur P suivant
+            qc.append(
+                oracle_grover_preparation(n_bits, L, Qa, Qfin).to_instruction(),
+                [*Qa, *Qfin],
+            )
 
     # -- Comparaison des états superposés avec l'entier b (porte P répétée p fois) --
     if P:
         if p is None:
             # Theoriquement : comme g
             # Empiriquement : p=2 pour N<=3 et p=2 pour N>4
-            p = int(round(sqrt(2**n_bits / len(L))))
+            p = int(round((pi / 4) * sqrt(2**n_bits / len(L)) - 0.5))
 
         if show_logs:
             print(f"Itérations de P: {p}")
@@ -729,13 +735,13 @@ def check_all_possibilities(number_of_bits):
 
 
 if __name__ == "__main__":
-    platform = "IONQ"
+    platform = "IBM"
     if platform == "IBM":
         print("Using IBM platform...\n")
         service = QiskitRuntimeService(name="personnal")
 
         # print(f"Ordinateurs disponibles: {service.backends()}")
-        backend = service.get_backend("ibm_kyoto")
+        backend = service.get_backend("simulator_mps")
         # simulateurs : simulator_mps, ibmq_qasm_simulator, simulator_statevector
         # vrai système : ibm_brisbane
     else:
@@ -746,12 +752,14 @@ if __name__ == "__main__":
 
     # Test de la recherche du minimum dans une liste L
     # L = [18927, 189, 2801901, 29, 18019, 9182, 1829382]  # seulement sur des vrais ordinateurs quantiques
-    L = [29, 2, 31, 19, 11, 29, 12, 7]
+    L = [19, 8, 13, 2, 29, 4, 8, 30, 17, 12, 9]
 
-    # minimum_val = minimum_search_circuit(L, backend, yi=12, g=3, p=1, show_hist=True)
+    minimum_val = minimum_search_circuit(
+        L, backend, yi=12, show_hist=True, show_logs=True
+    )
 
     # show_oracle_compare_integers(3)
     # show_oracle_grover_preparation(L)
     # show_diffusion_operator(4)
 
-    minimum_search(L, backend, g=5, p=1, plot_fig=False, show_logs=True)
+    # minimum_search(L, backend, g=5, p=1, plot_fig=False, show_logs=True)
