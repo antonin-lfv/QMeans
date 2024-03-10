@@ -466,8 +466,7 @@ def minimum_search_circuit(
     # -- Préparation des états superposés pour la recherche de minimum (porte G répété g fois) --
     if G:
         if g is None:
-            # Theoriquement : g=pi/4*sqrt(2^n/N) où N est le nombre d'éléments dans L et n est le nombre de qubits
-            # Empiriquement : g=5 pour N>4 et g=2 pour N<=3
+            # Theoriquement : g=pi/4*sqrt(2^n/N)-0.5 où N est le nombre d'éléments dans L et n est le nombre de qubits
             g = int(round((pi / 4) * sqrt(2**n_bits / len(L)) - 0.5))
 
         if show_logs:
@@ -490,7 +489,6 @@ def minimum_search_circuit(
     if P:
         if p is None:
             # Theoriquement : comme g
-            # Empiriquement : p=2 pour N<=3 et p=2 pour N>4
             p = int(round((pi / 4) * sqrt(2**n_bits / len(L)) - 0.5))
 
         if show_logs:
@@ -752,14 +750,14 @@ if __name__ == "__main__":
 
     # Test de la recherche du minimum dans une liste L
     # L = [18927, 189, 2801901, 29, 18019, 9182, 1829382]  # seulement sur des vrais ordinateurs quantiques
-    L = [19, 8, 13, 2, 29, 4, 8, 30, 17, 12, 9]
+    L = [3, 4, 7, 8, 10, 13, 5, 12, 1, 11, 6, 2, 9]
 
     minimum_val = minimum_search_circuit(
-        L, backend, yi=12, show_hist=True, show_logs=True
+        L, backend, yi=4, show_hist=True, show_logs=True
     )
 
     # show_oracle_compare_integers(3)
     # show_oracle_grover_preparation(L)
     # show_diffusion_operator(4)
 
-    # minimum_search(L, backend, g=5, p=1, plot_fig=False, show_logs=True)
+    # minimum_search(L, backend, plot_fig=False, show_logs=True)
