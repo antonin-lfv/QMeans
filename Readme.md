@@ -7,6 +7,3 @@
 
 <h4 align="center">A quantum version of the KMeans algorithm, using Qiskit</h4>
 
-> **Note:** French detailed article [here]().
-
-# Introduction
