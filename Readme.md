@@ -2,5 +2,11 @@
   <img src="https://github.com/antonin-lfv/QMeans/assets/63207451/79c11b83-111e-4f70-baf2-6b4246789d3d" width="260">
 <br>
 </br>
-  Algorithme QMeans (Kmeans quantique)
+  QMeans Algorithm
 </h1>
+
+<h4 align="center">A quantum version of the KMeans algorithm, using Qiskit</h4>
+
+> **Note:** French detailed article [here]().
+
+# Introduction
