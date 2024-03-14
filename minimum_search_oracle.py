@@ -467,7 +467,7 @@ def minimum_search_circuit(
     if G:
         if g is None:
             # Theoriquement : g=pi/4*sqrt(2^n/N)-0.5 où N est le nombre d'éléments dans L et n est le nombre de qubits
-            g = int(round((pi / 4) * sqrt(2**n_bits / len(L)) - 0.5))
+            g = max(int(round((pi / 4) * sqrt(2**n_bits / len(L)) - 0.5)), 2)
 
         if show_logs:
             print(f"Itérations de G: {g}")
@@ -489,7 +489,7 @@ def minimum_search_circuit(
     if P:
         if p is None:
             # Theoriquement : comme g
-            p = int(round((pi / 4) * sqrt(2**n_bits / len(L)) - 0.5))
+            p = max(int(round((pi / 4) * sqrt(2**n_bits / len(L)) - 0.5)), 1)
 
         if show_logs:
             print(f"Itérations de P: {p}")
@@ -750,14 +750,33 @@ if __name__ == "__main__":
 
     # Test de la recherche du minimum dans une liste L
     # L = [18927, 189, 2801901, 29, 18019, 9182, 1829382]  # seulement sur des vrais ordinateurs quantiques
-    L = [3, 4, 7, 8, 10, 13, 5, 12, 1, 11, 6, 2, 9]
+    L = [13, 4, 17, 8, 10, 12, 5, 15, 1, 11, 6, 2, 9, 7, 3, 14, 19, 16, 18, 10]
+    # Liste aléatoire de 13 entiers sur 5 qubits
+    # L = [random.randint(1, 2**5 - 1) for _ in range(13)]
+    # Valeur de yi pour la comparaison (aléatoire)
+    yi = random.choice(L)
 
-    minimum_val = minimum_search_circuit(
-        L, backend, yi=4, show_hist=True, show_logs=True
-    )
+    # minimum_val = minimum_search_circuit(L, backend, yi=yi, show_hist=True, show_logs=True)
 
     # show_oracle_compare_integers(3)
     # show_oracle_grover_preparation(L)
     # show_diffusion_operator(4)
 
-    # minimum_search(L, backend, plot_fig=False, show_logs=True)
+    minimum_search(L, backend, plot_fig=True, show_logs=True, g=2, p=1)
+
+    """
+    -- Calcul de la vitesse de yi --
+    
+    Liste de taille 13, 5 qubits:
+        Taille de l'ensemble amplifié au cours des itérations: 
+            * [3, 1, 0]
+            * [6, 4, 0]
+            * [4, 1, 0]
+            * [8, 5, 4, 1, 0]
+            * [3, 2, 1, 0]
+        
+    Liste de taille 20, 5 qubits:
+        Taille de l'ensemble amplifié au cours des itérations: 
+            * [6, 2, 0]
+            * [9, 2, 0]
+    """
