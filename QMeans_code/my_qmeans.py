@@ -32,9 +32,7 @@ class QMeans:
         """
         Méthode Maximin: Cette méthode vise à maximiser la distance minimale entre les centroïdes, en commençant
         par un centroïde choisi au hasard, puis en sélectionnant les centroïdes suivants de manière à maximiser
-        la distance minimale par rapport aux centroïdes déjà choisis. L'optimisation mentionnée dans le texte
-        que vous avez partagé consiste à réduire le nombre de calculs de distance nécessaires en conservant
-        une trace des distances minimales déjà calculées et en évitant les calculs inutiles.
+        la distance minimale par rapport aux centroïdes déjà choisis.
 
         url article : https://borgelt.net/papers/data_20.pdf
         """
