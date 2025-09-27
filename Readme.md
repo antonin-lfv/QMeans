@@ -7,4 +7,4 @@
 
 <h4 align="center">A quantum version of the KMeans algorithm, using Qiskit</h4>
 
-[Pré-version du papier ici](https://easychair.org/publications/preprint/JV22)
+[Pré-version du papier ici](https://easychair.org/publications/preprint/JV22) - [Version française](https://antonin-lfv.github.io/assets/pdf/QMeans.pdf)
