@@ -1,9 +1,0 @@
-numpy
-plotly
-fastdist
-scikit-learn
-scipy
-qiskit
-tqdm
-matplotlib
-qat
