@@ -30,10 +30,10 @@ if __name__ == "__main__":
 
     delta_init = 0.0005
 
-    service = "IBM"
+    service = "IonQ"
     if service == "IBM":
         print("Using IBM Quantum Service")
-        service = QiskitRuntimeService()
+        service = QiskitRuntimeService('ibm_quantum_platform')
         backend = service.backend("simulator_mps")
 
     else:

@@ -57,6 +57,27 @@ The new centroids are calculated classically by computing the barycenter of the 
 
 $$c_i = \frac{1}{|C_i|} \sum_{x \in C_i} x$$
 
+## Getting Started
+
+Start by creating the file `config.py` in the root directory with the following content (replace the placeholders with your actual API tokens):
+
+```python
+IBM_QUANTUM_API_TOKEN = "YOUR_IBM_QUANTUM_API_TOKEN"
+IONQ_API_TOKEN = "YOUR_IONQ_API_TOKEN"
+```
+
+Then, install the environment using UV:
+
+```bash
+uv sync
+```
+
+And run the main script:
+
+```bash
+uv run main.py
+```
+
 ## ❝ Citation
 
 If you use this code or the paper in your research, please cite the following:

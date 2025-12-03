@@ -4,3 +4,4 @@ config.py
 /images
 /article_images/
 .python-version
+.DS_Store
