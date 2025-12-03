@@ -489,7 +489,7 @@ def minimum_search_circuit(
     if P:
         if p is None:
             # Theoriquement : comme g
-            p = max(int(round((pi / 4) * sqrt(2**n_bits / len(L)) - 0.5)), 1)
+            p = max(int(round((pi / 4) * sqrt(2**n_bits / len(L)) - 0.5)), 2)
 
         if show_logs:
             print(f"Itérations de P: {p}")
@@ -750,19 +750,23 @@ if __name__ == "__main__":
 
     # Test de la recherche du minimum dans une liste L
     # L = [18927, 189, 2801901, 29, 18019, 9182, 1829382]  # seulement sur des vrais ordinateurs quantiques
-    L = [13, 4, 17, 8, 10, 12, 5, 15, 1, 11, 6, 2, 9, 7, 3, 14, 19, 16, 18, 10]
-    # Liste aléatoire de 13 entiers sur 5 qubits
-    # L = [random.randint(1, 2**5 - 1) for _ in range(13)]
+    # L = [13, 4, 17, 8, 10, 12, 5, 15, 1, 11, 6, 2, 9, 7, 3, 14, 19, 16, 18, 10]
+    # Liste aléatoire de n entiers sur k qubits
+    n, k = 50, 5
+    random.seed(0)
+    L = [random.randint(1, 2**k - 1) for _ in range(n)]
     # Valeur de yi pour la comparaison (aléatoire)
     yi = random.choice(L)
 
-    # minimum_val = minimum_search_circuit(L, backend, yi=yi, show_hist=True, show_logs=True)
+    minimum_val = minimum_search_circuit(
+        L, backend, yi=max(L), show_hist=True, show_logs=True, g=3, p=3
+    )
 
     # show_oracle_compare_integers(3)
     # show_oracle_grover_preparation(L)
     # show_diffusion_operator(4)
 
-    minimum_search(L, backend, plot_fig=True, show_logs=True, g=2, p=1)
+    # minimum_search(L, backend, plot_fig=True, show_logs=True, g=2, p=2)
 
     """
     -- Calcul de la vitesse de yi --
@@ -779,4 +783,6 @@ if __name__ == "__main__":
         Taille de l'ensemble amplifié au cours des itérations: 
             * [6, 2, 0]
             * [9, 2, 0]
+    
+    Liste de taille 50, 5 qubits:
     """
